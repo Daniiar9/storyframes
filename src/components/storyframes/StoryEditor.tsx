@@ -15,6 +15,7 @@ import {
 import { Sparkles, Download, Wand2, RotateCcw, ArrowUp, Pencil, X } from "lucide-react";
 import { Uploader } from "./Uploader";
 import { FrameCard } from "./FrameCard";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   exportStory,
   nextSuggestion,
@@ -174,6 +175,7 @@ export function StoryEditor() {
   }, [imageFrames.length, totalCount]);
 
   return (
+    <TooltipProvider delayDuration={200}>
     <div className="min-h-screen bg-background text-foreground">
       {/* Top bar */}
       <header className="sticky top-0 z-30 border-b border-foreground/15 bg-background/85 backdrop-blur">
@@ -187,20 +189,30 @@ export function StoryEditor() {
           <div className="flex items-center gap-2">
             <span className="hidden text-xs text-muted-foreground md:inline">{headerStats}</span>
             {hasGenerated && (
-              <button
-                onClick={reset}
-                className="inline-flex items-center gap-1.5 border border-foreground/30 px-3 py-2 text-xs uppercase tracking-[0.18em] transition hover:bg-accent"
-              >
-                <RotateCcw className="h-3.5 w-3.5" /> Reset
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={reset}
+                    className="inline-flex items-center gap-1.5 border border-foreground/30 px-3 py-2 text-xs uppercase tracking-[0.18em] transition hover:bg-accent"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" /> Reset
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Clear all frames and start over</TooltipContent>
+              </Tooltip>
             )}
-            <button
-              onClick={doExport}
-              disabled={!hasGenerated || totalCount === 0}
-              className="inline-flex items-center gap-1.5 bg-foreground px-4 py-2 text-xs uppercase tracking-[0.18em] text-background transition hover:bg-foreground/85 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Download className="h-3.5 w-3.5" /> Export
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={doExport}
+                  disabled={!hasGenerated || totalCount === 0}
+                  className="inline-flex items-center gap-1.5 bg-foreground px-4 py-2 text-xs uppercase tracking-[0.18em] text-background transition hover:bg-foreground/85 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Download className="h-3.5 w-3.5" /> Export story
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Download the ordered story as a text file</TooltipContent>
+            </Tooltip>
           </div>
         </div>
       </header>
@@ -327,6 +339,7 @@ export function StoryEditor() {
         </div>
       )}
     </div>
+    </TooltipProvider>
   );
 }
 
