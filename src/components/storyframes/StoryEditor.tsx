@@ -12,7 +12,7 @@ import {
   arrayMove,
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Sparkles, Download, Wand2, RotateCcw, ArrowUp } from "lucide-react";
+import { Sparkles, Download, Wand2, RotateCcw, ArrowUp, Pencil, X } from "lucide-react";
 import { Uploader } from "./Uploader";
 import { FrameCard } from "./FrameCard";
 import {
@@ -29,6 +29,7 @@ export function StoryEditor() {
   const [includeOutro, setIncludeOutro] = useState(true);
   const [generating, setGenerating] = useState<Set<string>>(new Set());
   const [hasGenerated, setHasGenerated] = useState(false);
+  const [promptOpen, setPromptOpen] = useState(true);
 
   const imageFrames = frames.filter((f) => f.kind === "image");
 
@@ -108,6 +109,7 @@ export function StoryEditor() {
     setFrames(base);
     setGenerating(new Set(base.map((f) => f.id)));
     setHasGenerated(true);
+    setPromptOpen(false);
 
     // Stagger reveal for nice UX
     for (let i = 0; i < base.length; i++) {
@@ -149,6 +151,7 @@ export function StoryEditor() {
     setFrames([]);
     setContext("");
     setHasGenerated(false);
+    setPromptOpen(true);
   }
 
   function doExport() {
@@ -202,7 +205,11 @@ export function StoryEditor() {
         </div>
       </header>
 
-      <main className={`mx-auto max-w-[1400px] px-6 py-10 ${frames.length > 0 ? "pb-44" : ""}`}>
+      <main
+        className={`mx-auto max-w-[1400px] px-6 py-10 ${
+          frames.length > 0 && (!hasGenerated || promptOpen) ? "pb-44" : ""
+        }`}
+      >
         {/* Stage 1 — empty: hero + uploader, NO prompt yet */}
         {frames.length === 0 ? (
           <section className="space-y-10">
@@ -232,6 +239,13 @@ export function StoryEditor() {
           </section>
         ) : (
           <section>
+            {hasGenerated && !promptOpen && (
+              <PromptChip
+                context={context}
+                onEdit={() => setPromptOpen(true)}
+                onRegenerate={generate}
+              />
+            )}
             <div className="mb-6 flex items-end justify-between">
               <div>
                 <p className="font-display text-xs uppercase tracking-[0.25em] text-muted-foreground">
@@ -281,9 +295,20 @@ export function StoryEditor() {
       </main>
 
       {/* Stage 2/3 — sticky chat-like prompt bar at bottom, only after uploads */}
-      {frames.length > 0 && (
+      {frames.length > 0 && (!hasGenerated || promptOpen) && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-foreground/15 bg-background/95 backdrop-blur">
           <div className="mx-auto max-w-[1400px] px-6 py-4">
+            {hasGenerated && (
+              <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+                <span>Edit prompt</span>
+                <button
+                  onClick={() => setPromptOpen(false)}
+                  className="inline-flex items-center gap-1 hover:text-foreground"
+                >
+                  <X className="h-3 w-3" /> Close
+                </button>
+              </div>
+            )}
             <PromptBar
               context={context}
               setContext={setContext}
@@ -291,7 +316,9 @@ export function StoryEditor() {
               setIncludeIntro={setIncludeIntro}
               includeOutro={includeOutro}
               setIncludeOutro={setIncludeOutro}
-              onGenerate={generate}
+              onGenerate={() => {
+                generate();
+              }}
               canGenerate={canGenerate}
               hasGenerated={hasGenerated}
               imagesCount={imageFrames.length}
@@ -299,6 +326,40 @@ export function StoryEditor() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function PromptChip({
+  context,
+  onEdit,
+  onRegenerate,
+}: {
+  context: string;
+  onEdit: () => void;
+  onRegenerate: () => void;
+}) {
+  return (
+    <div className="mb-6 flex items-center gap-3 border border-foreground/15 bg-card px-4 py-3">
+      <span className="hidden text-[10px] uppercase tracking-[0.22em] text-muted-foreground sm:inline">
+        Prompt
+      </span>
+      <span className="hidden h-4 w-px bg-foreground/15 sm:inline-block" />
+      <p className="flex-1 truncate text-sm italic text-foreground/80">
+        {context.trim() ? `"${context.trim()}"` : <span className="not-italic text-muted-foreground">No prompt provided</span>}
+      </p>
+      <button
+        onClick={onEdit}
+        className="inline-flex items-center gap-1.5 border border-foreground/25 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.18em] transition hover:bg-accent"
+      >
+        <Pencil className="h-3 w-3" /> Edit
+      </button>
+      <button
+        onClick={onRegenerate}
+        className="inline-flex items-center gap-1.5 bg-foreground px-2.5 py-1.5 text-[10px] uppercase tracking-[0.18em] text-background transition hover:bg-foreground/85"
+      >
+        <Wand2 className="h-3 w-3" /> Regenerate
+      </button>
     </div>
   );
 }
