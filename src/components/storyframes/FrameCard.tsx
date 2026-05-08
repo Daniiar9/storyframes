@@ -3,6 +3,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, X, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Frame } from "@/lib/storyframes";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Props {
   frame: Frame;
@@ -43,28 +44,43 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
           )}
         </div>
         <div className="flex items-center gap-1">
-          <button
-            onClick={onRegenerate}
-            title="Regenerate"
-            className="flex h-7 w-7 items-center justify-center text-muted-foreground transition hover:text-foreground"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-          </button>
-          <button
-            {...attributes}
-            {...listeners}
-            title="Drag to reorder"
-            className="flex h-7 w-7 cursor-grab items-center justify-center text-muted-foreground transition hover:text-foreground active:cursor-grabbing"
-          >
-            <GripVertical className="h-4 w-4" />
-          </button>
-          <button
-            onClick={onRemove}
-            title="Remove"
-            className="flex h-7 w-7 items-center justify-center text-muted-foreground transition hover:text-destructive"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={onRegenerate}
+                aria-label="Regenerate this frame"
+                className="flex h-7 w-7 items-center justify-center text-muted-foreground transition hover:text-foreground"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Regenerate title & caption</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                {...attributes}
+                {...listeners}
+                aria-label="Drag to reorder"
+                className="flex h-7 w-7 cursor-grab items-center justify-center text-muted-foreground transition hover:text-foreground active:cursor-grabbing"
+              >
+                <GripVertical className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Drag to reorder</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={onRemove}
+                aria-label="Remove frame"
+                className="flex h-7 w-7 items-center justify-center text-muted-foreground transition hover:text-destructive"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Remove this frame</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
@@ -140,9 +156,9 @@ function InlineEdit({ value, onChange, placeholder, className, multiline, loadin
 
   if (loading) {
     return (
-      <div className={`${className} animate-pulse`}>
+      <div className={`${className} animate-pulse space-y-2`} aria-busy="true" aria-label="Generating">
         <div className="h-3 w-3/4 bg-foreground/10" />
-        {multiline && <div className="mt-2 h-3 w-1/2 bg-foreground/10" />}
+        {multiline && <div className="h-3 w-1/2 bg-foreground/10" />}
       </div>
     );
   }
@@ -189,7 +205,8 @@ function InlineEdit({ value, onChange, placeholder, className, multiline, loadin
     <button
       type="button"
       onClick={() => setEditing(true)}
-      className={`${className} cursor-text border-b border-transparent text-left transition hover:border-foreground/30`}
+      title="Click to edit"
+      className={`${className} group/edit cursor-text border-b border-dotted border-transparent text-left transition hover:border-foreground/60`}
     >
       {value || <span className="text-muted-foreground/60">{placeholder}</span>}
     </button>
