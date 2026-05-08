@@ -12,7 +12,7 @@ import {
   arrayMove,
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Sparkles, Download, Wand2, RotateCcw } from "lucide-react";
+import { Sparkles, Download, Wand2, RotateCcw, ArrowUp } from "lucide-react";
 import { Uploader } from "./Uploader";
 import { FrameCard } from "./FrameCard";
 import {
@@ -202,66 +202,34 @@ export function StoryEditor() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1400px] px-6 py-10">
-        {/* Hero / context */}
-        <section className="mb-12 grid gap-8 md:grid-cols-[1.2fr_1fr] md:gap-12">
-          <div className="space-y-5">
-            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-              Issue №01 — A Story Builder
-            </p>
-            <h1 className="font-display text-5xl leading-[0.95] md:text-6xl">
-              Turn a folder of images
-              <br />
-              into a <em className="italic text-foreground/70">clean ordered story.</em>
-            </h1>
-            <p className="max-w-xl text-base leading-relaxed text-muted-foreground">
-              Upload screenshots, photos, or mockups. Drag to reorder. Add one prompt about
-              what you're trying to show. We'll write titles, captions, and an intro & ending —
-              all editable.
-            </p>
-          </div>
-
-          <div className="border border-foreground/20 bg-card p-6">
-            <label className="font-display text-xs uppercase tracking-[0.22em] text-muted-foreground">
-              The prompt
-            </label>
-            <p className="mt-1 font-display text-2xl leading-tight">
-              What are you trying to show?
-            </p>
-            <textarea
-              value={context}
-              onChange={(e) => setContext(e.target.value)}
-              rows={3}
-              placeholder="e.g. The redesign of our checkout flow, from the original problem to the final shipped screens."
-              className="mt-4 w-full resize-none border-b border-foreground/30 bg-transparent pb-2 text-sm leading-relaxed outline-none transition focus:border-foreground"
-            />
-
-            <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
-              <Toggle label="Intro frame" checked={includeIntro} onChange={setIncludeIntro} />
-              <Toggle label="Ending takeaway" checked={includeOutro} onChange={setIncludeOutro} />
-            </div>
-
-            <button
-              onClick={generate}
-              disabled={!canGenerate}
-              className="mt-6 inline-flex w-full items-center justify-center gap-2 bg-foreground px-4 py-3 text-sm font-medium tracking-wide text-background transition hover:bg-foreground/85 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Wand2 className="h-4 w-4" />
-              {hasGenerated ? "Regenerate story" : "Generate story"}
-            </button>
-            {!canGenerate && (
-              <p className="mt-2 text-center text-xs text-muted-foreground">
-                Add at least one image below to begin.
-              </p>
-            )}
-          </div>
-        </section>
-
-        <div className="rule mb-10" />
-
-        {/* Frames area */}
+      <main className={`mx-auto max-w-[1400px] px-6 py-10 ${frames.length > 0 ? "pb-44" : ""}`}>
+        {/* Stage 1 — empty: hero + uploader, NO prompt yet */}
         {frames.length === 0 ? (
-          <Uploader onFiles={addFiles} />
+          <section className="space-y-10">
+            <div className="space-y-5">
+              <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+                Issue №01 — A Story Builder
+              </p>
+              <h1 className="font-display text-5xl leading-[0.95] md:text-6xl">
+                Turn a folder of images
+                <br />
+                into a <em className="italic text-foreground/70">clean ordered story.</em>
+              </h1>
+              <p className="max-w-xl text-base leading-relaxed text-muted-foreground">
+                Start by dropping in your images. Once they're here, you'll tell us what
+                you're trying to show — and we'll write titles, captions, and an intro &
+                ending you can edit.
+              </p>
+              <ol className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-2 text-xs uppercase tracking-[0.22em] text-muted-foreground">
+                <li><span className="text-foreground">01</span> Upload images</li>
+                <li className="text-foreground/30">·</li>
+                <li><span className="text-foreground/40">02</span> Describe the story</li>
+                <li className="text-foreground/30">·</li>
+                <li><span className="text-foreground/40">03</span> Generate & edit</li>
+              </ol>
+            </div>
+            <Uploader onFiles={addFiles} />
+          </section>
         ) : (
           <section>
             <div className="mb-6 flex items-end justify-between">
@@ -275,7 +243,7 @@ export function StoryEditor() {
                 <p className="mt-1 text-sm text-muted-foreground">
                   {hasGenerated
                     ? "Drag to reorder. Click any title or caption to edit."
-                    : "Drag to reorder. Add more, then generate."}
+                    : "Drag to reorder. Add more — then describe your story below."}
                 </p>
               </div>
               {hasGenerated && (
@@ -311,6 +279,93 @@ export function StoryEditor() {
           <span className="font-display tracking-[0.2em]">№01 · 2026</span>
         </footer>
       </main>
+
+      {/* Stage 2/3 — sticky chat-like prompt bar at bottom, only after uploads */}
+      {frames.length > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-foreground/15 bg-background/95 backdrop-blur">
+          <div className="mx-auto max-w-[1400px] px-6 py-4">
+            <PromptBar
+              context={context}
+              setContext={setContext}
+              includeIntro={includeIntro}
+              setIncludeIntro={setIncludeIntro}
+              includeOutro={includeOutro}
+              setIncludeOutro={setIncludeOutro}
+              onGenerate={generate}
+              canGenerate={canGenerate}
+              hasGenerated={hasGenerated}
+              imagesCount={imageFrames.length}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PromptBar({
+  context,
+  setContext,
+  includeIntro,
+  setIncludeIntro,
+  includeOutro,
+  setIncludeOutro,
+  onGenerate,
+  canGenerate,
+  hasGenerated,
+  imagesCount,
+}: {
+  context: string;
+  setContext: (v: string) => void;
+  includeIntro: boolean;
+  setIncludeIntro: (v: boolean) => void;
+  includeOutro: boolean;
+  setIncludeOutro: (v: boolean) => void;
+  onGenerate: () => void;
+  canGenerate: boolean;
+  hasGenerated: boolean;
+  imagesCount: number;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-end gap-3 rounded-md border border-foreground/25 bg-card p-3 focus-within:border-foreground">
+        <div className="flex-1">
+          <label className="block text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+            What are you trying to show?
+          </label>
+          <textarea
+            value={context}
+            onChange={(e) => setContext(e.target.value)}
+            rows={1}
+            autoFocus={!hasGenerated}
+            placeholder={`Describe your story — e.g. the redesign of our checkout, from problem to shipped screens. (${imagesCount} image${imagesCount === 1 ? "" : "s"} ready)`}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && canGenerate) {
+                e.preventDefault();
+                onGenerate();
+              }
+            }}
+            className="mt-1 max-h-40 min-h-[28px] w-full resize-none bg-transparent text-sm leading-relaxed outline-none placeholder:text-muted-foreground/70"
+          />
+        </div>
+        <button
+          onClick={onGenerate}
+          disabled={!canGenerate}
+          title={hasGenerated ? "Regenerate story" : "Generate story"}
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center bg-foreground text-background transition hover:bg-foreground/85 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {hasGenerated ? <Wand2 className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
+        </button>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-1 text-[11px] text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+          <Toggle label="Intro frame" checked={includeIntro} onChange={setIncludeIntro} />
+          <Toggle label="Ending takeaway" checked={includeOutro} onChange={setIncludeOutro} />
+        </div>
+        <span className="hidden sm:inline">
+          {hasGenerated ? "Edit prompt and regenerate anytime" : "⌘/Ctrl + Enter to generate"}
+        </span>
+      </div>
     </div>
   );
 }
