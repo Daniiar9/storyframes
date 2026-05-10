@@ -13,6 +13,7 @@ import {
   FRAME_DURATION,
   FocusPoint,
   getFrameMotion,
+  hasRenderableMotion,
   motionScaleByIntensity,
   StoryFrame,
   StoryProject,
@@ -81,65 +82,62 @@ function focusPointToCoordinates(focusPoint: FocusPoint) {
 }
 
 function getMotionTransform(storyFrame: StoryFrame, currentFrame: number) {
-  const { motionPreset, motionIntensity, focusPoint, focusX, focusY } = getFrameMotion(storyFrame);
+  const { motionIntensity, focusPoint, focusX, focusY, zoom, pan } = getFrameMotion(storyFrame);
   const progress = interpolate(currentFrame, [0, FRAME_DURATION], [0, 1], {
     extrapolateRight: "clamp",
   });
   const maxScale = motionScaleByIntensity[motionIntensity];
   const baseFocus = focusPointToCoordinates(focusPoint);
+  const hasFocus = typeof focusX === "number" && typeof focusY === "number";
   const targetFocus = {
     x: clamp(focusX ?? baseFocus.x, 0, 1),
     y: clamp(focusY ?? baseFocus.y, 0, 1),
   };
   const origin = `${targetFocus.x * 100}% ${targetFocus.y * 100}%`;
-  const panDistanceByIntensity = {
+  const panDistance = {
     subtle: 1.8,
     medium: 3,
     strong: 4.2,
   }[motionIntensity];
 
-  if (motionPreset === "none") {
+  if (!hasRenderableMotion(storyFrame)) {
     return { transform: "translate3d(0, 0, 0) scale(1)", transformOrigin: origin };
   }
 
-  if (motionPreset === "zoom_out") {
-    const scale = interpolate(progress, [0, 1], [maxScale, 1]);
-    return { transform: `translate3d(0, 0, 0) scale(${scale})`, transformOrigin: origin };
+  // Combined zoom + pan around focus target (when zoom is set, focus is required).
+  // Keep image partially zoomed in around focus throughout the loop so the
+  // selected area stays visible — no drifting back to full frame.
+  const zoomDelta = maxScale - 1;
+  const baseZoom = hasFocus && zoom !== "none" ? 1 + zoomDelta * 0.45 : 1;
+
+  let scale = 1;
+  if (zoom === "in") {
+    scale = interpolate(progress, [0, 1], [baseZoom, baseZoom + zoomDelta * 0.55]);
+  } else if (zoom === "out") {
+    scale = interpolate(progress, [0, 1], [baseZoom + zoomDelta * 0.55, baseZoom]);
+  } else {
+    scale = baseZoom;
   }
 
-  if (motionPreset === "pan_left" || motionPreset === "pan_right") {
-    const start = motionPreset === "pan_left" ? panDistanceByIntensity : -panDistanceByIntensity;
-    const end = -start;
-    const translateX = interpolate(progress, [0, 1], [start, end]);
-    return {
-      transform: `translate3d(${translateX}%, 0, 0) scale(${Math.min(maxScale, 1.045)})`,
-      transformOrigin: origin,
-    };
+  // When pan is combined with a zoom focus, reduce + balance pan so the
+  // focused area never drifts off-screen.
+  const panAmount = hasFocus && zoom !== "none" ? panDistance * 0.35 : panDistance;
+  let translateX = 0;
+  let translateY = 0;
+  if (pan === "left" || pan === "right") {
+    const half = panAmount / 2;
+    const dir = pan === "left" ? 1 : -1;
+    translateX = interpolate(progress, [0, 1], [dir * half, -dir * half]);
+  } else if (pan === "up" || pan === "down") {
+    const half = panAmount / 2;
+    const dir = pan === "up" ? 1 : -1;
+    translateY = interpolate(progress, [0, 1], [dir * half, -dir * half]);
   }
 
-  if (motionPreset === "pan_up" || motionPreset === "pan_down") {
-    const start = motionPreset === "pan_up" ? panDistanceByIntensity : -panDistanceByIntensity;
-    const end = -start;
-    const translateY = interpolate(progress, [0, 1], [start, end]);
-    return {
-      transform: `translate3d(0, ${translateY}%, 0) scale(${Math.min(maxScale, 1.045)})`,
-      transformOrigin: origin,
-    };
-  }
-
-  if (motionPreset === "focus_zoom") {
-    const endScale = Math.min(maxScale, 1.1);
-    const scale = interpolate(progress, [0, 1], [1, endScale]);
-    const translateX = interpolate(progress, [0, 1], [0, clamp((0.5 - targetFocus.x) * 10, -4.5, 4.5)]);
-    const translateY = interpolate(progress, [0, 1], [0, clamp((0.5 - targetFocus.y) * 10, -4.5, 4.5)]);
-    return {
-      transform: `translate3d(${translateX}%, ${translateY}%, 0) scale(${scale})`,
-      transformOrigin: origin,
-    };
-  }
-
-  const scale = interpolate(progress, [0, 1], [1, maxScale]);
-  return { transform: `translate3d(0, 0, 0) scale(${scale})`, transformOrigin: origin };
+  return {
+    transform: `translate3d(${translateX}%, ${translateY}%, 0) scale(${scale})`,
+    transformOrigin: origin,
+  };
 }
 
 function ImageFrame({ storyFrame, index }: { storyFrame: StoryFrame; index: number }) {
