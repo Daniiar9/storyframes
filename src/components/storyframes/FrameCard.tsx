@@ -1,15 +1,6 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  GripVertical,
-  X,
-  Sparkles,
-  ChevronDown,
-  ArrowLeft,
-  ArrowRight,
-  ArrowUp,
-  ArrowDown,
-} from "lucide-react";
+import { GripVertical, X, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type {
   Frame,
@@ -18,6 +9,7 @@ import type {
   MotionPreset,
 } from "@/lib/storyframes";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useMotionPick } from "./MotionPickContext";
 
 interface Props {
   frame: Frame;
@@ -44,9 +36,10 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
   const focusPoint: FocusPoint = frame.focusPoint ?? "center";
   const hasCustomFocus = frame.focusX != null && frame.focusY != null;
 
-  const [motionOpen, setMotionOpen] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
   const imgWrapRef = useRef<HTMLDivElement>(null);
+  const { armed, applyTo } = useMotionPick();
+  const isPickable = !!armed && !!frame.imageUrl;
 
   // Re-trigger the in-card preview animation whenever motion settings change
   useEffect(() => {
@@ -55,19 +48,19 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
   }, [preset, intensity, focusPoint, frame.focusX, frame.focusY, frame.imageUrl]);
 
   function handleImageClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (!imgWrapRef.current) return;
-    const rect = imgWrapRef.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const y = (e.clientY - rect.top) / rect.height;
-    onChange({
-      focusX: clamp01(x),
-      focusY: clamp01(y),
-      motionPreset: "focus_zoom",
-      motionIntensity: frame.motionIntensity ?? "subtle",
-    });
+    if (!armed || !imgWrapRef.current) return;
+    if (armed.kind === "customFocus") {
+      const rect = imgWrapRef.current.getBoundingClientRect();
+      const x = clamp01((e.clientX - rect.left) / rect.width);
+      const y = clamp01((e.clientY - rect.top) / rect.height);
+      applyTo(frame.id, { focusX: x, focusY: y });
+    } else {
+      applyTo(frame.id);
+    }
   }
 
-  function resetFocus() {
+  function clearFocus(e: React.MouseEvent) {
+    e.stopPropagation();
     onChange({ focusX: undefined, focusY: undefined });
   }
 
@@ -75,7 +68,9 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
     <div
       ref={setNodeRef}
       style={style}
-      className="group relative flex flex-col bg-card"
+      className={`group relative flex flex-col bg-card transition ${
+        isPickable ? "ring-1 ring-foreground/30 hover:ring-foreground" : ""
+      }`}
     >
       {/* number + drag */}
       <div className="flex items-center justify-between border-b border-foreground/15 px-3 py-2">
@@ -136,9 +131,8 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
         data-no-dnd
         onClick={frame.imageUrl ? handleImageClick : undefined}
         className={`group/img relative aspect-[4/3] w-full overflow-hidden bg-secondary ${
-          frame.imageUrl ? "cursor-crosshair" : ""
+          isPickable ? "cursor-crosshair" : ""
         }`}
-        title={frame.imageUrl ? "Click to set focus point" : undefined}
       >
         {frame.imageUrl ? (
           <img
@@ -157,16 +151,20 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
           </div>
         )}
 
-        {/* helper text — only on hover, only when image is present */}
-        {frame.imageUrl && (
-          <span className="pointer-events-none absolute bottom-2 left-2 border border-foreground/30 bg-background/80 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.18em] text-foreground/70 opacity-0 transition group-hover/img:opacity-100">
-            Click image to set focus
-          </span>
-        )}
-
-        {/* focus marker */}
+        {/* focus marker (custom point) */}
         {frame.imageUrl && hasCustomFocus && (
-          <FocusMarker x={frame.focusX!} y={frame.focusY!} />
+          <>
+            <FocusMarker x={frame.focusX!} y={frame.focusY!} />
+            <button
+              type="button"
+              onClick={clearFocus}
+              aria-label="Clear focus point"
+              className="absolute right-2 top-2 z-10 flex h-5 w-5 items-center justify-center border border-foreground/30 bg-background/85 text-foreground/70 transition hover:text-foreground"
+              title="Clear focus point"
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+          </>
         )}
       </div>
 
@@ -188,289 +186,7 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
           loading={loading}
         />
       </div>
-
-      {/* MOTION section */}
-      {frame.imageUrl && (
-        <MotionSection
-          open={motionOpen}
-          onToggle={() => setMotionOpen((v) => !v)}
-          preset={preset}
-          intensity={intensity}
-          focusPoint={focusPoint}
-          hasCustomFocus={hasCustomFocus}
-          onPreset={(p) => onChange({ motionPreset: p })}
-          onIntensity={(i) => onChange({ motionIntensity: i })}
-          onFocusPoint={(fp) =>
-            onChange({ focusPoint: fp, focusX: undefined, focusY: undefined })
-          }
-          onResetFocus={resetFocus}
-        />
-      )}
     </div>
-  );
-}
-
-/* --------------------------------------------------------------------- */
-/*  Motion section                                                       */
-/* --------------------------------------------------------------------- */
-
-const PRESET_LABEL: Record<MotionPreset, string> = {
-  none: "Static",
-  zoom_in: "Zoom in",
-  zoom_out: "Zoom out",
-  pan_left: "Pan left",
-  pan_right: "Pan right",
-  pan_up: "Pan up",
-  pan_down: "Pan down",
-  focus_zoom: "Focus zoom",
-};
-
-const FOCUS_LABEL: Record<FocusPoint, string> = {
-  center: "Center",
-  top: "Top",
-  bottom: "Bottom",
-  left: "Left",
-  right: "Right",
-};
-
-function MotionSection({
-  open,
-  onToggle,
-  preset,
-  intensity,
-  focusPoint,
-  hasCustomFocus,
-  onPreset,
-  onIntensity,
-  onFocusPoint,
-  onResetFocus,
-}: {
-  open: boolean;
-  onToggle: () => void;
-  preset: MotionPreset;
-  intensity: MotionIntensity;
-  focusPoint: FocusPoint;
-  hasCustomFocus: boolean;
-  onPreset: (p: MotionPreset) => void;
-  onIntensity: (i: MotionIntensity) => void;
-  onFocusPoint: (fp: FocusPoint) => void;
-  onResetFocus: () => void;
-}) {
-  const isPan = preset.startsWith("pan_");
-  const summary =
-    preset === "none"
-      ? "Static"
-      : `${PRESET_LABEL[preset]} · ${cap(intensity)} · ${
-          hasCustomFocus ? "Custom focus" : FOCUS_LABEL[focusPoint]
-        }`;
-
-  return (
-    <div className="border-t border-foreground/15">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="group/motion flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition hover:bg-accent/40"
-      >
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="font-display text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-            Motion
-          </span>
-          <span className="truncate text-xs text-foreground/80">{summary}</span>
-        </div>
-        <ChevronDown
-          className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition ${
-            open ? "rotate-180" : ""
-          }`}
-        />
-      </button>
-
-      {open && (
-        <div className="space-y-4 border-t border-foreground/10 px-4 py-4">
-          {/* Motion */}
-          <div className="space-y-1.5">
-            <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-              Motion
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              <Pill active={preset === "none"} onClick={() => onPreset("none")}>None</Pill>
-              <Pill active={preset === "zoom_in"} onClick={() => onPreset("zoom_in")}>Zoom in</Pill>
-              <Pill active={preset === "zoom_out"} onClick={() => onPreset("zoom_out")}>Zoom out</Pill>
-              <Pill active={isPan} onClick={() => onPreset("pan_right")}>Pan</Pill>
-              <Pill active={preset === "focus_zoom"} onClick={() => onPreset("focus_zoom")}>Focus zoom</Pill>
-            </div>
-
-            {isPan && (
-              <div className="flex items-center gap-2 pt-1.5">
-                <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Direction
-                </span>
-                <div className="flex gap-1">
-                  <IconPill active={preset === "pan_left"} onClick={() => onPreset("pan_left")} label="Pan left">
-                    <ArrowLeft className="h-3 w-3" />
-                  </IconPill>
-                  <IconPill active={preset === "pan_right"} onClick={() => onPreset("pan_right")} label="Pan right">
-                    <ArrowRight className="h-3 w-3" />
-                  </IconPill>
-                  <IconPill active={preset === "pan_up"} onClick={() => onPreset("pan_up")} label="Pan up">
-                    <ArrowUp className="h-3 w-3" />
-                  </IconPill>
-                  <IconPill active={preset === "pan_down"} onClick={() => onPreset("pan_down")} label="Pan down">
-                    <ArrowDown className="h-3 w-3" />
-                  </IconPill>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Intensity */}
-          {preset !== "none" && (
-            <div className="space-y-1.5">
-              <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-                Intensity
-              </p>
-              <div className="flex gap-1.5">
-                <Pill active={intensity === "subtle"} onClick={() => onIntensity("subtle")}>Subtle</Pill>
-                <Pill active={intensity === "medium"} onClick={() => onIntensity("medium")}>Medium</Pill>
-                <Pill active={intensity === "strong"} onClick={() => onIntensity("strong")}>Strong</Pill>
-              </div>
-            </div>
-          )}
-
-          {/* Focus */}
-          {preset !== "none" && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-                  Focus
-                </p>
-                {hasCustomFocus && (
-                  <button
-                    onClick={onResetFocus}
-                    className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground underline-offset-2 transition hover:text-foreground hover:underline"
-                  >
-                    Reset focus
-                  </button>
-                )}
-              </div>
-              <div className="flex gap-1">
-                {(["left", "top", "center", "bottom", "right"] as FocusPoint[]).map((fp) => (
-                  <FocusPill
-                    key={fp}
-                    point={fp}
-                    active={!hasCustomFocus && focusPoint === fp}
-                    onClick={() => onFocusPoint(fp)}
-                  />
-                ))}
-              </div>
-              {preset === "focus_zoom" && !hasCustomFocus && (
-                <p className="pt-1 text-[10px] italic text-muted-foreground">
-                  Or click the image above to pick a custom point.
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Pill({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`border px-2.5 py-1 text-[11px] tracking-wide transition ${
-        active
-          ? "border-foreground bg-foreground text-background"
-          : "border-foreground/25 text-foreground/80 hover:border-foreground/60"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function IconPill({
-  active,
-  onClick,
-  label,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          aria-label={label}
-          onClick={onClick}
-          className={`flex h-6 w-6 items-center justify-center border transition ${
-            active
-              ? "border-foreground bg-foreground text-background"
-              : "border-foreground/25 text-foreground/70 hover:border-foreground/60"
-          }`}
-        >
-          {children}
-        </button>
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
-  );
-}
-
-function FocusPill({
-  point,
-  active,
-  onClick,
-}: {
-  point: FocusPoint;
-  active: boolean;
-  onClick: () => void;
-}) {
-  // dot position inside the 24x24 pill
-  const pos: Record<FocusPoint, { left: string; top: string }> = {
-    center: { left: "50%", top: "50%" },
-    top: { left: "50%", top: "20%" },
-    bottom: { left: "50%", top: "80%" },
-    left: { left: "20%", top: "50%" },
-    right: { left: "80%", top: "50%" },
-  };
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          aria-label={`Focus ${FOCUS_LABEL[point]}`}
-          onClick={onClick}
-          className={`relative h-6 w-6 border transition ${
-            active
-              ? "border-foreground bg-foreground/5"
-              : "border-foreground/25 hover:border-foreground/60"
-          }`}
-        >
-          <span
-            className={`absolute h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full ${
-              active ? "bg-foreground" : "bg-foreground/50"
-            }`}
-            style={pos[point]}
-          />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent>{FOCUS_LABEL[point]}</TooltipContent>
-    </Tooltip>
   );
 }
 

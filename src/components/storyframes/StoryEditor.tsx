@@ -15,6 +15,8 @@ import {
 import { Sparkles, Download, Wand2, RotateCcw, ArrowUp, Pencil, X } from "lucide-react";
 import { Uploader } from "./Uploader";
 import { FrameCard } from "./FrameCard";
+import { MotionPickProvider } from "./MotionPickContext";
+import { MotionWidget } from "./MotionWidget";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   exportStory,
@@ -176,6 +178,7 @@ export function StoryEditor() {
 
   return (
     <TooltipProvider delayDuration={200}>
+    <MotionPickProvider frames={frames} patch={patchFrame}>
     <div className="min-h-screen bg-background text-foreground">
       {/* Top bar */}
       <header className="sticky top-0 z-30 border-b border-foreground/15 bg-background/85 backdrop-blur">
@@ -338,7 +341,12 @@ export function StoryEditor() {
           </div>
         </div>
       )}
+
+      {frames.some((f) => f.imageUrl) && (
+        <MotionWidget frames={frames} patch={patchFrame} />
+      )}
     </div>
+    </MotionPickProvider>
     </TooltipProvider>
   );
 }
