@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Plus, X, HelpCircle, Crosshair } from "lucide-react";
+import { Plus, X, HelpCircle, Crosshair, ChevronDown } from "lucide-react";
 import type {
   FocusPoint,
   Frame,
@@ -53,7 +53,10 @@ export function MotionWidget({
   applyToAll,
 }: Props) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [open, setOpen] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const dragRef = useRef<{ dx: number; dy: number } | null>(null);
+  const movedRef = useRef(false);
   const wRef = useRef<HTMLDivElement>(null);
 
   const imageFrames = frames.filter((f) => f.imageUrl);
@@ -71,7 +74,7 @@ export function MotionWidget({
     } catch {}
     const w = window.innerWidth;
     const h = window.innerHeight;
-    setPos({ x: w - 320 - 24, y: h - 360 - 24 });
+    setPos({ x: w - 72 - 24, y: h - 72 - 24 });
   }, []);
 
   // Esc cancels selection mode / deselects
@@ -80,19 +83,27 @@ export function MotionWidget({
       if (e.key !== "Escape") return;
       if (selecting) setSelecting(false);
       else if (selectedId) setSelectedId(null);
+      else if (open) setOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selecting, selectedId, setSelecting, setSelectedId]);
+  }, [selecting, selectedId, open, setSelecting, setSelectedId]);
+
+  // Auto-expand when entering pick mode or a frame becomes selected
+  useEffect(() => {
+    if (selecting || selectedId) setOpen(true);
+  }, [selecting, selectedId]);
 
   function onDragDown(e: React.PointerEvent) {
     if (!wRef.current) return;
     const rect = wRef.current.getBoundingClientRect();
     dragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+    movedRef.current = false;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   }
   function onDragMove(e: React.PointerEvent) {
     if (!dragRef.current || !wRef.current) return;
+    movedRef.current = true;
     const w = wRef.current.offsetWidth;
     const h = wRef.current.offsetHeight;
     const x = Math.max(8, Math.min(window.innerWidth - w - 8, e.clientX - dragRef.current.dx));
@@ -119,6 +130,10 @@ export function MotionWidget({
   const focus: FocusPoint = selected?.focusPoint ?? "center";
   const hasCustom = selected?.focusX != null && selected?.focusY != null;
 
+  const motionCount = imageFrames.filter(
+    (f) => f.motionPreset && f.motionPreset !== "none",
+  ).length;
+
   return (
     <>
       {/* Selection-mode banner */}
@@ -142,6 +157,34 @@ export function MotionWidget({
         </div>
       )}
 
+      {!open ? (
+        <div
+          ref={wRef}
+          className="fixed z-50 select-none"
+          style={{ left: pos.x, top: pos.y }}
+        >
+          <button
+            type="button"
+            aria-label="Open motion controls"
+            onPointerDown={onDragDown}
+            onPointerMove={onDragMove}
+            onPointerUp={(e) => {
+              const moved = movedRef.current;
+              onDragUp(e);
+              if (!moved) setOpen(true);
+            }}
+            onPointerCancel={onDragUp}
+            className="group relative flex h-14 w-14 cursor-grab items-center justify-center rounded-full bg-gradient-to-br from-foreground to-foreground/70 text-background shadow-[0_8px_24px_rgba(0,0,0,0.18)] transition hover:scale-105 active:cursor-grabbing"
+          >
+            <span className="font-display text-lg tracking-[0.18em]">SF</span>
+            {motionCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-background bg-card px-1 text-[10px] font-semibold text-foreground">
+                {motionCount}
+              </span>
+            )}
+          </button>
+        </div>
+      ) : (
       <div
         ref={wRef}
         role="region"
@@ -157,16 +200,61 @@ export function MotionWidget({
           onPointerCancel={onDragUp}
           className="flex h-9 cursor-grab items-center justify-between border-b border-foreground/15 bg-background px-3 active:cursor-grabbing"
         >
-          <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-            Motion
-          </span>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <HelpCircle
-              className="h-3.5 w-3.5"
-              aria-label="Pick a frame, then choose its motion"
-            />
+          <div className="flex items-center gap-2">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-foreground to-foreground/70 font-display text-[9px] tracking-[0.1em] text-background">
+              SF
+            </span>
+            <span className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+              Motion
+            </span>
+          </div>
+          <div className="flex items-center gap-1 text-muted-foreground">
+            {!selected && !selecting && (
+              <button
+                type="button"
+                aria-label="Pick a frame"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelecting(true);
+                }}
+                disabled={imageFrames.length === 0}
+                className="flex h-6 w-6 items-center justify-center transition hover:text-foreground disabled:opacity-30"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            )}
+            <button
+              type="button"
+              aria-label="Help"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowHelp((v) => !v);
+              }}
+              className="flex h-6 w-6 items-center justify-center transition hover:text-foreground"
+            >
+              <HelpCircle className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              aria-label="Collapse"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(false);
+              }}
+              className="flex h-6 w-6 items-center justify-center transition hover:text-foreground"
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
+
+        {showHelp && (
+          <div className="border-b border-foreground/15 bg-secondary/60 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+            Click <span className="font-semibold text-foreground">+</span> to pick a frame, then
+            choose its motion, intensity, and focus. Drag the dot on the image to set a custom
+            focus point.
+          </div>
+        )}
 
         {/* Body */}
         {!selected ? (
@@ -203,6 +291,7 @@ export function MotionWidget({
           />
         )}
       </div>
+      )}
     </>
   );
 }
