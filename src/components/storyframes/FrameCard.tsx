@@ -318,10 +318,6 @@ function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
-function cap(s: string) {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
 interface InlineEditProps {
   value: string;
   onChange: (v: string) => void;
