@@ -227,8 +227,10 @@ export function FrameCard({
               </button>
             </PopoverTrigger>
             <PopoverContent
-              side="top"
-              align="end"
+              side="right"
+              align="start"
+              sideOffset={12}
+              collisionPadding={16}
               className="w-80 p-0"
               onOpenAutoFocus={(e) => e.preventDefault()}
             >
