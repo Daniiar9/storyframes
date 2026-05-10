@@ -12,13 +12,14 @@ import {
   arrayMove,
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Sparkles, Download, Wand2, RotateCcw, ArrowUp, Pencil, X } from "lucide-react";
+import { Sparkles, Download, Wand2, RotateCcw, ArrowUp, Pencil, X, Play, Pause, ChevronLeft, ChevronRight } from "lucide-react";
 import { Uploader } from "./Uploader";
 import { FrameCard } from "./FrameCard";
-import { MotionWidget } from "./MotionWidget";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   exportStory,
+  hasMotion,
+  motionStyle,
   nextSuggestion,
   uid,
   type Frame,
@@ -32,8 +33,7 @@ export function StoryEditor() {
   const [generating, setGenerating] = useState<Set<string>>(new Set());
   const [hasGenerated, setHasGenerated] = useState(false);
   const [promptOpen, setPromptOpen] = useState(true);
-  const [selectedMotionId, setSelectedMotionId] = useState<string | null>(null);
-  const [selectingMotion, setSelectingMotion] = useState(false);
+  const [playing, setPlaying] = useState(false);
 
   const imageFrames = frames.filter((f) => f.kind === "image");
 
@@ -210,6 +210,19 @@ export function StoryEditor() {
                 <TooltipContent>Clear all frames and start over</TooltipContent>
               </Tooltip>
             )}
+            {hasGenerated && imageFrames.length > 0 && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setPlaying(true)}
+                    className="inline-flex items-center gap-1.5 border border-primary bg-primary px-3 py-2 text-xs uppercase tracking-[0.18em] text-primary-foreground transition hover:bg-primary/85"
+                  >
+                    <Play className="h-3.5 w-3.5" /> Animate
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Play the full story</TooltipContent>
+              </Tooltip>
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
@@ -299,13 +312,8 @@ export function StoryEditor() {
                       onChange={(p) => patchFrame(f.id, p)}
                       onRemove={() => removeFrame(f.id)}
                       onRegenerate={() => regenerateOne(f.id)}
+                      onApplyToAll={applyMotionToAll}
                       loading={generating.has(f.id)}
-                      selecting={selectingMotion}
-                      selected={selectedMotionId === f.id}
-                      onSelect={() => {
-                        setSelectedMotionId(f.id);
-                        setSelectingMotion(false);
-                      }}
                     />
                   ))}
                   <Uploader onFiles={addFiles} variant="compact" />
@@ -354,16 +362,8 @@ export function StoryEditor() {
         </div>
       )}
 
-      {frames.some((f) => f.imageUrl) && (
-        <MotionWidget
-          frames={frames}
-          selectedId={selectedMotionId}
-          setSelectedId={setSelectedMotionId}
-          selecting={selectingMotion}
-          setSelecting={setSelectingMotion}
-          patch={patchFrame}
-          applyToAll={applyMotionToAll}
-        />
+      {playing && (
+        <StoryPlayer frames={frames} onClose={() => setPlaying(false)} />
       )}
     </div>
     </TooltipProvider>
