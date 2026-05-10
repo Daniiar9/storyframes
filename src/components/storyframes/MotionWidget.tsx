@@ -367,6 +367,14 @@ function SelectedPanel({
   onClose: () => void;
   onClearMotion: () => void;
 }) {
+  const [appliedAt, setAppliedAt] = useState(0);
+  const justApplied = appliedAt > 0 && Date.now() - appliedAt < 1800;
+  useEffect(() => {
+    if (!appliedAt) return;
+    const t = setTimeout(() => setAppliedAt(0), 1800);
+    return () => clearTimeout(t);
+  }, [appliedAt]);
+
   return (
     <div>
       {/* Selected frame chip */}
@@ -471,18 +479,23 @@ function SelectedPanel({
         </button>
         <button
           type="button"
-          onClick={() =>
+          onClick={() => {
             applyToAll({
               motionPreset: preset,
               motionIntensity: intensity,
               focusPoint: focus,
               focusX: undefined,
               focusY: undefined,
-            })
-          }
-          className="bg-foreground px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-background transition hover:bg-foreground/85"
+            });
+            setAppliedAt(Date.now());
+          }}
+          className={`px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] transition ${
+            justApplied
+              ? "bg-primary text-primary-foreground"
+              : "bg-foreground text-background hover:bg-foreground/85"
+          }`}
         >
-          Apply to all
+          {justApplied ? "Applied ✓" : "Apply to all"}
         </button>
       </div>
     </div>
