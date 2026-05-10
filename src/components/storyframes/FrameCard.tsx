@@ -233,6 +233,18 @@ export function FrameCard({
               collisionPadding={16}
               className="w-80 p-0"
               onOpenAutoFocus={(e) => e.preventDefault()}
+              onPointerDownOutside={(e) => {
+                // Don't close when clicking the image of the same card —
+                // that click is for setting the focus point.
+                if (imgWrapRef.current?.contains(e.target as Node)) {
+                  e.preventDefault();
+                }
+              }}
+              onInteractOutside={(e) => {
+                if (imgWrapRef.current?.contains(e.target as Node)) {
+                  e.preventDefault();
+                }
+              }}
             >
               <div className="border-b border-foreground/15 px-3 py-2">
                 <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
