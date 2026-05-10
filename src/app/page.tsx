@@ -76,17 +76,6 @@ type GenerationResponse = {
 const emptyStatus = "Upload images, order them, then generate the story.";
 const UPLOAD_INPUT_ID = "storyframes-image-upload";
 
-const motionPresetOptions: Array<{ value: MotionPreset; label: string }> = [
-  { value: "none", label: "None" },
-  { value: "zoom_in", label: "Zoom in" },
-  { value: "zoom_out", label: "Zoom out" },
-  { value: "pan_left", label: "Pan left" },
-  { value: "pan_right", label: "Pan right" },
-  { value: "pan_up", label: "Pan up" },
-  { value: "pan_down", label: "Pan down" },
-  { value: "focus_zoom", label: "Focus zoom" },
-];
-
 const motionIntensityOptions: Array<{ value: MotionIntensity; label: string }> = [
   { value: "subtle", label: "Subtle" },
   { value: "medium", label: "Medium" },
