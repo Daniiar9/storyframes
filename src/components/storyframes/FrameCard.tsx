@@ -57,10 +57,10 @@ export function FrameCard({
   const hasFocus = frame.focusX != null && frame.focusY != null;
   const motionOn = hasMotion(frame);
   const previewMotionOn = hasRenderableMotion(frame);
-  const awaitingFocus = editing && zoom !== "none" && !hasFocus;
 
   const [editing, setEditing] = useState(false);
   const [appliedAt, setAppliedAt] = useState(0);
+  const awaitingFocus = editing && zoom !== "none" && !hasFocus;
   const justApplied = appliedAt > 0 && Date.now() - appliedAt < 1500;
   useEffect(() => {
     if (!appliedAt) return;
