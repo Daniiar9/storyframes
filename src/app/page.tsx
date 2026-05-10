@@ -108,7 +108,9 @@ function SortableThumbnail({
       data-testid={`thumbnail-${index}`}
       onClick={onSelect}
       className={`group grid w-full grid-cols-[34px_74px_1fr_22px] items-center gap-3 border p-2 text-left transition ${
-        selected ? "border-stone-950 bg-[#f7f5ef]" : "border-stone-300 bg-[#fbfaf6] hover:border-stone-950"
+        selected
+          ? "border-stone-950 bg-[#f7f5ef] shadow-[inset_4px_0_0_#1c1917]"
+          : "border-stone-300 bg-[#fbfaf6] hover:border-stone-950"
       } ${isDragging ? "opacity-60" : ""}`}
       style={{ transform: CSS.Transform.toString(transform), transition }}
     >
@@ -266,6 +268,8 @@ export default function Home() {
 
   const selectedFrame = frames.find((frame) => frame.id === selectedId) ?? frames[0] ?? null;
   const durationInFrames = Math.max(getStoryDurationInFrames(story), VIDEO_FPS);
+  const hasGeneratedStory =
+    frames.some((frame) => frame.title.trim() || frame.caption.trim()) || Boolean(introFrame || outroFrame);
 
   async function handleFiles(files: FileList | File[]) {
     const imageFiles = Array.from(files).filter((file) => file.type.startsWith("image/"));
@@ -545,7 +549,9 @@ export default function Home() {
             <span className="font-mono text-[11px] font-semibold uppercase text-stone-500">
               Empty storyboard
             </span>
-            <span className="max-w-44 text-sm leading-6">Upload screenshots or images to start shaping the story.</span>
+            <span className="max-w-48 text-sm leading-6">
+              Upload images first. Then describe the story in the prompt bar and generate.
+            </span>
           </button>
         )}
       </aside>
@@ -615,6 +621,9 @@ export default function Home() {
               </span>
               <span className="max-w-sm text-center text-2xl font-semibold">
                 Drop screenshots or images here
+              </span>
+              <span className="max-w-md text-center text-sm leading-6 text-stone-400">
+                01 Upload images. 02 Describe what you are trying to show. 03 Generate the story.
               </span>
             </button>
           )}
@@ -780,7 +789,7 @@ export default function Home() {
         </div>
       </aside>
 
-      <section className="fixed inset-x-0 bottom-0 z-20 border-t border-stone-950 bg-[#ebe7dc]/95 px-4 py-3 backdrop-blur lg:left-[320px]">
+      <section className="fixed inset-x-0 bottom-0 z-20 border-t border-stone-950 bg-[#ebe7dc]/95 px-4 py-3 backdrop-blur lg:left-[320px] lg:right-[390px]">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 lg:flex-row lg:items-end">
           <div className="flex min-w-0 flex-1 flex-col">
             <div className="mb-2 flex items-center gap-2">
@@ -788,7 +797,7 @@ export default function Home() {
                 Prompt
               </span>
               <label htmlFor="context" className="font-mono text-[10px] uppercase text-stone-500">
-                What are you trying to show?
+                {hasGeneratedStory ? "Edit prompt and regenerate" : "What are you trying to show?"}
               </label>
             </div>
             <textarea
@@ -806,7 +815,7 @@ export default function Home() {
             className="inline-flex h-16 items-center justify-center gap-2 border border-stone-950 bg-stone-950 px-5 font-mono text-[11px] font-semibold uppercase text-white transition hover:bg-transparent hover:text-stone-950 disabled:cursor-not-allowed disabled:opacity-45 lg:min-w-52"
           >
             {isGenerating ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
-            Generate story
+            {hasGeneratedStory ? "Regenerate story" : "Generate story"}
           </button>
         </div>
       </section>
