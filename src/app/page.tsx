@@ -28,6 +28,14 @@ import {
   Plus,
   Sparkles,
   Upload,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  ArrowDown,
+  ZoomIn,
+  ZoomOut,
+  Ban,
+  Crosshair,
 } from "lucide-react";
 import type { MouseEvent } from "react";
 import { useMemo, useState } from "react";
@@ -36,15 +44,21 @@ import {
   DEFAULT_FOCUS_POINT,
   DEFAULT_MOTION_INTENSITY,
   DEFAULT_MOTION_PRESET,
+  DEFAULT_PAN,
+  DEFAULT_ZOOM,
   FocusPoint,
   getFrameMotion,
   getStoryDurationInFrames,
+  hasFocusTarget,
+  hasRenderableMotion,
   MotionIntensity,
   MotionPreset,
+  Pan,
   StoryFrame,
   StoryProject,
   TextFrame,
   VIDEO_FPS,
+  Zoom,
 } from "@/lib/story";
 import { StoryVideo } from "@/remotion/StoryVideo";
 
@@ -62,30 +76,21 @@ type GenerationResponse = {
 const emptyStatus = "Upload images, order them, then generate the story.";
 const UPLOAD_INPUT_ID = "storyframes-image-upload";
 
-const motionPresetOptions: Array<{ value: MotionPreset; label: string }> = [
-  { value: "none", label: "None" },
-  { value: "zoom_in", label: "Zoom in" },
-  { value: "zoom_out", label: "Zoom out" },
-  { value: "pan_left", label: "Pan left" },
-  { value: "pan_right", label: "Pan right" },
-  { value: "pan_up", label: "Pan up" },
-  { value: "pan_down", label: "Pan down" },
-  { value: "focus_zoom", label: "Focus zoom" },
-];
-
 const motionIntensityOptions: Array<{ value: MotionIntensity; label: string }> = [
   { value: "subtle", label: "Subtle" },
   { value: "medium", label: "Medium" },
   { value: "strong", label: "Strong" },
 ];
 
-const focusPointOptions: Array<{ value: FocusPoint; label: string }> = [
-  { value: "center", label: "Center" },
-  { value: "top", label: "Top" },
-  { value: "bottom", label: "Bottom" },
-  { value: "left", label: "Left" },
-  { value: "right", label: "Right" },
-];
+function zoomToPreset(zoom: Zoom, pan: Pan, hasFocus: boolean): MotionPreset {
+  if (zoom === "in") return hasFocus ? "focus_zoom" : "zoom_in";
+  if (zoom === "out") return "zoom_out";
+  if (pan === "left") return "pan_left";
+  if (pan === "right") return "pan_right";
+  if (pan === "up") return "pan_up";
+  if (pan === "down") return "pan_down";
+  return "none";
+}
 
 function SortableThumbnail({
   frame,
@@ -210,6 +215,93 @@ function SelectField<T extends string>({
   );
 }
 
+const PILL_BASE =
+  "inline-flex h-9 items-center justify-center gap-1.5 border px-3 font-mono text-[10px] font-semibold uppercase transition cursor-pointer";
+const PILL_ON = "border-stone-950 bg-stone-950 text-white";
+const PILL_OFF = "border-stone-300 bg-[#fbfaf6] text-stone-700 hover:border-stone-950";
+
+function MotionControls({
+  frame,
+  onSetZoom,
+  onSetPan,
+  onSetIntensity,
+}: {
+  frame: StoryFrame;
+  onSetZoom: (zoom: Zoom) => void;
+  onSetPan: (pan: Pan) => void;
+  onSetIntensity: (intensity: MotionIntensity) => void;
+}) {
+  const motion = getFrameMotion(frame);
+  const zoomBtn = (value: Zoom, label: string, Icon: typeof ZoomIn) => (
+    <button
+      key={value}
+      type="button"
+      onClick={() => onSetZoom(value)}
+      className={`${PILL_BASE} ${motion.zoom === value ? PILL_ON : PILL_OFF}`}
+    >
+      <Icon size={13} />
+      {label}
+    </button>
+  );
+  const panBtn = (value: Pan, Icon: typeof ArrowLeft, label: string) => (
+    <button
+      key={value}
+      type="button"
+      title={label}
+      aria-label={`Pan ${label.toLowerCase()}`}
+      onClick={() => onSetPan(value)}
+      className={`${PILL_BASE} h-9 w-9 px-0 ${motion.pan === value ? PILL_ON : PILL_OFF}`}
+    >
+      <Icon size={14} />
+    </button>
+  );
+
+  return (
+    <div className="mt-4 space-y-4 border-t border-stone-300 pt-4">
+      <div>
+        <h3 className="mb-2 font-mono text-[10px] font-semibold uppercase text-stone-500">Zoom</h3>
+        <div className="flex flex-wrap gap-2">
+          {zoomBtn("none", "None", Ban)}
+          {zoomBtn("in", "In", ZoomIn)}
+          {zoomBtn("out", "Out", ZoomOut)}
+        </div>
+      </div>
+      <div>
+        <h3 className="mb-2 font-mono text-[10px] font-semibold uppercase text-stone-500">Pan</h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onSetPan("none")}
+            className={`${PILL_BASE} ${motion.pan === "none" ? PILL_ON : PILL_OFF}`}
+          >
+            <Ban size={13} />
+            None
+          </button>
+          {panBtn("left", ArrowLeft, "Left")}
+          {panBtn("right", ArrowRight, "Right")}
+          {panBtn("up", ArrowUp, "Up")}
+          {panBtn("down", ArrowDown, "Down")}
+        </div>
+      </div>
+      <div>
+        <h3 className="mb-2 font-mono text-[10px] font-semibold uppercase text-stone-500">Intensity</h3>
+        <div className="flex flex-wrap gap-2">
+          {motionIntensityOptions.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onSetIntensity(opt.value)}
+              className={`${PILL_BASE} ${motion.motionIntensity === opt.value ? PILL_ON : PILL_OFF}`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 async function readImageFile(file: File) {
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -324,13 +416,45 @@ export default function Home() {
     const focusX = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
     const focusY = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
 
+    const motion = getFrameMotion(frame);
     updateFrame(frame.id, {
       focusX,
       focusY,
-      motionPreset: "focus_zoom",
+      motionPreset: zoomToPreset(motion.zoom === "none" ? "in" : motion.zoom, motion.pan, true),
+      zoom: motion.zoom === "none" ? "in" : motion.zoom,
       motionIntensity: frame.motionIntensity ?? DEFAULT_MOTION_INTENSITY,
     });
-    setStatus("Focus point set.");
+    setStatus("Focus locked. Adjust zoom, pan, or intensity.");
+  }
+
+  function setZoom(frame: StoryFrame, zoom: Zoom) {
+    const motion = getFrameMotion(frame);
+    // Switching zoom direction always clears the previous focus so the
+    // user explicitly retargets the area to zoom into/out of.
+    const clearFocus = zoom !== "none" && zoom !== motion.zoom;
+    updateFrame(frame.id, {
+      zoom,
+      motionPreset: zoomToPreset(zoom, motion.pan, !clearFocus && hasFocusTarget(frame)),
+      ...(clearFocus ? { focusX: undefined, focusY: undefined } : null),
+    });
+    if (zoom !== "none") {
+      setStatus(`Click on image to target zoom ${zoom}.`);
+    } else {
+      setStatus("Zoom cleared.");
+    }
+  }
+
+  function setPan(frame: StoryFrame, pan: Pan) {
+    const motion = getFrameMotion(frame);
+    updateFrame(frame.id, {
+      pan,
+      motionPreset: zoomToPreset(motion.zoom, pan, hasFocusTarget(frame)),
+    });
+    setStatus(pan === "none" ? "Pan cleared." : `Pan set: ${pan}.`);
+  }
+
+  function setIntensity(frame: StoryFrame, motionIntensity: MotionIntensity) {
+    updateFrame(frame.id, { motionIntensity });
   }
 
   async function generateStory() {
@@ -659,38 +783,65 @@ export default function Home() {
                   {String(Math.max(1, frames.findIndex((frame) => frame.id === selectedFrame.id) + 1)).padStart(2, "0")}
                 </span>
               </div>
-              <div className="mb-3">
-                <div className="relative overflow-hidden border border-stone-300 bg-stone-950">
-                  <img
-                    src={selectedFrame.imageDataUrl}
-                    alt=""
-                    data-testid="focus-image"
-                    className="block max-h-56 w-full cursor-crosshair object-contain"
-                    onClick={(event) => setCustomFocus(selectedFrame, event)}
-                  />
-                  {typeof selectedFrame.focusX === "number" && typeof selectedFrame.focusY === "number" ? (
-                    <span
-                      data-testid="focus-marker"
-                      className="pointer-events-none absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 border border-white/80 bg-[#346766]/70 shadow-[0_0_0_3px_rgba(52,103,102,0.22)]"
-                      style={{ left: `${selectedFrame.focusX * 100}%`, top: `${selectedFrame.focusY * 100}%` }}
-                    />
-                  ) : null}
-                </div>
-                <div className="mt-2 flex items-center justify-between gap-3">
-                  <p className="font-mono text-[10px] uppercase text-stone-500">
-                    Click image to set focus
-                  </p>
-                  {typeof selectedFrame.focusX === "number" && typeof selectedFrame.focusY === "number" ? (
-                    <button
-                      type="button"
-                      onClick={() => updateFrame(selectedFrame.id, { focusX: undefined, focusY: undefined })}
-                      className="cursor-pointer font-mono text-[10px] font-semibold uppercase text-stone-950 underline underline-offset-4"
-                    >
-                      Reset focus
-                    </button>
-                  ) : null}
-                </div>
-              </div>
+              {(() => {
+                const motion = getFrameMotion(selectedFrame);
+                const hasFocus = hasFocusTarget(selectedFrame);
+                const awaitingFocus = motion.zoom !== "none" && !hasFocus;
+                return (
+                  <div className="mb-3">
+                    <div className="relative overflow-hidden border border-stone-300 bg-stone-950">
+                      <img
+                        src={selectedFrame.imageDataUrl}
+                        alt=""
+                        data-testid="focus-image"
+                        className={`block max-h-56 w-full object-contain ${
+                          motion.zoom !== "none" ? "cursor-crosshair" : "cursor-default"
+                        }`}
+                        onClick={(event) => {
+                          if (motion.zoom === "none") {
+                            setStatus("Pick Zoom In or Out first, then click to target.");
+                            return;
+                          }
+                          setCustomFocus(selectedFrame, event);
+                        }}
+                      />
+                      {hasFocus ? (
+                        <span
+                          data-testid="focus-marker"
+                          className="pointer-events-none absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 border-2 border-white bg-[#346766]/60 shadow-[0_0_0_3px_rgba(52,103,102,0.3)]"
+                          style={{ left: `${(selectedFrame.focusX ?? 0.5) * 100}%`, top: `${(selectedFrame.focusY ?? 0.5) * 100}%` }}
+                        />
+                      ) : null}
+                      {awaitingFocus ? (
+                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-stone-950/55">
+                          <div className="flex items-center gap-2 border border-white bg-stone-950/80 px-3 py-2 font-mono text-[10px] font-semibold uppercase text-white">
+                            <Crosshair size={14} />
+                            Click on image to target zoom {motion.zoom}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <p className="font-mono text-[10px] uppercase text-stone-500">
+                        {motion.zoom === "none"
+                          ? "Choose zoom in/out to target an area"
+                          : hasFocus
+                            ? "Focus locked"
+                            : "Awaiting focus target"}
+                      </p>
+                      {hasFocus ? (
+                        <button
+                          type="button"
+                          onClick={() => updateFrame(selectedFrame.id, { focusX: undefined, focusY: undefined })}
+                          className="cursor-pointer font-mono text-[10px] font-semibold uppercase text-stone-950 underline underline-offset-4"
+                        >
+                          Reset focus
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })()}
               <label
                 className="mb-1 block font-mono text-[10px] font-semibold uppercase text-stone-500"
                 htmlFor="frame-title"
@@ -717,36 +868,12 @@ export default function Home() {
                 placeholder="Generated caption appears here"
                 className="min-h-24 w-full resize-none border border-stone-300 bg-[#fbfaf6] p-3 text-sm leading-6 outline-none transition focus:border-stone-950"
               />
-              <div className="mt-4 border-t border-stone-300 pt-4">
-                <h3 className="mb-3 font-mono text-[10px] font-semibold uppercase text-stone-500">
-                  Motion
-                </h3>
-                <div className="grid grid-cols-1 gap-3">
-                  <SelectField
-                    id="motion-preset"
-                    label="Motion"
-                    value={getFrameMotion(selectedFrame).motionPreset}
-                    options={motionPresetOptions}
-                    onChange={(motionPreset) => updateFrame(selectedFrame.id, { motionPreset })}
-                  />
-                  <SelectField
-                    id="motion-intensity"
-                    label="Intensity"
-                    value={getFrameMotion(selectedFrame).motionIntensity}
-                    options={motionIntensityOptions}
-                    onChange={(motionIntensity) => updateFrame(selectedFrame.id, { motionIntensity })}
-                  />
-                  <SelectField
-                    id="focus-point"
-                    label="Focus"
-                    value={getFrameMotion(selectedFrame).focusPoint}
-                    options={focusPointOptions}
-                    onChange={(focusPoint) =>
-                      updateFrame(selectedFrame.id, { focusPoint, focusX: undefined, focusY: undefined })
-                    }
-                  />
-                </div>
-              </div>
+              <MotionControls
+                frame={selectedFrame}
+                onSetZoom={(zoom) => setZoom(selectedFrame, zoom)}
+                onSetPan={(pan) => setPan(selectedFrame, pan)}
+                onSetIntensity={(intensity) => setIntensity(selectedFrame, intensity)}
+              />
             </section>
           ) : (
             <section className="flex min-h-96 flex-col items-center justify-center border border-dashed border-stone-300 bg-[#f7f5ef] p-8 text-center">
