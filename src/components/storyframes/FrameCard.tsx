@@ -9,7 +9,6 @@ import type {
   MotionPreset,
 } from "@/lib/storyframes";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { FrameMotionMenu } from "./FrameMotionMenu";
 
 interface Props {
   frame: Frame;
@@ -18,10 +17,22 @@ interface Props {
   onRemove: () => void;
   onRegenerate: () => void;
   loading?: boolean;
-  onApplyToAll?: (patch: Partial<Frame>) => void;
+  selecting?: boolean;
+  selected?: boolean;
+  onSelect?: () => void;
 }
 
-export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, loading, onApplyToAll }: Props) {
+export function FrameCard({
+  frame,
+  index,
+  onChange,
+  onRemove,
+  onRegenerate,
+  loading,
+  selecting,
+  selected,
+  onSelect,
+}: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: frame.id,
   });
@@ -38,8 +49,11 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
   const hasCustomFocus = frame.focusX != null && frame.focusY != null;
 
   const [previewKey, setPreviewKey] = useState(0);
-  const [pickingFocus, setPickingFocus] = useState(false);
   const imgWrapRef = useRef<HTMLDivElement>(null);
+  const dotDragRef = useRef(false);
+
+  const isSelectable = !!selecting && !!frame.imageUrl && !selected;
+  const showDot = !!selected && !!frame.imageUrl;
 
   // Re-trigger the in-card preview animation whenever motion settings change
   useEffect(() => {
@@ -47,18 +61,14 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
     setPreviewKey((k) => k + 1);
   }, [preset, intensity, focusPoint, frame.focusX, frame.focusY, frame.imageUrl]);
 
-  // Esc cancels custom-focus pick mode
-  useEffect(() => {
-    if (!pickingFocus) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setPickingFocus(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [pickingFocus]);
-
   function handleImageClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (!pickingFocus || !imgWrapRef.current) return;
+    if (!isSelectable) return;
+    e.stopPropagation();
+    onSelect?.();
+  }
+
+  function setDotFromEvent(e: React.PointerEvent | PointerEvent) {
+    if (!imgWrapRef.current) return;
     const rect = imgWrapRef.current.getBoundingClientRect();
     const x = clamp01((e.clientX - rect.left) / rect.width);
     const y = clamp01((e.clientY - rect.top) / rect.height);
@@ -67,7 +77,26 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
       focusX: x,
       focusY: y,
     });
-    setPickingFocus(false);
+  }
+
+  function onImagePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (!showDot) return;
+    // Only react on direct image clicks, not children buttons
+    if ((e.target as HTMLElement).closest("[data-no-dot]")) return;
+    dotDragRef.current = true;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setDotFromEvent(e);
+  }
+  function onImagePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!dotDragRef.current) return;
+    setDotFromEvent(e);
+  }
+  function onImagePointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (!dotDragRef.current) return;
+    dotDragRef.current = false;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
   }
 
   function clearFocus(e: React.MouseEvent) {
@@ -79,7 +108,9 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
     <div
       ref={setNodeRef}
       style={style}
-      className="group relative flex flex-col bg-card transition"
+      className={`group relative flex flex-col bg-card transition ${
+        selected ? "ring-1 ring-foreground" : ""
+      } ${isSelectable ? "ring-1 ring-foreground/30 hover:ring-foreground" : ""}`}
     >
       {/* number + drag */}
       <div className="flex items-center justify-between border-b border-foreground/15 px-3 py-2">
@@ -90,6 +121,11 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
           {frame.kind !== "image" && (
             <span className="border border-foreground/40 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.18em]">
               {frame.kind}
+            </span>
+          )}
+          {selected && (
+            <span className="bg-foreground px-1.5 py-0.5 text-[10px] uppercase tracking-[0.18em] text-background">
+              Editing motion
             </span>
           )}
         </div>
@@ -139,8 +175,12 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
         ref={imgWrapRef}
         data-no-dnd
         onClick={frame.imageUrl ? handleImageClick : undefined}
+        onPointerDown={onImagePointerDown}
+        onPointerMove={onImagePointerMove}
+        onPointerUp={onImagePointerUp}
+        onPointerCancel={onImagePointerUp}
         className={`group/img relative aspect-[4/3] w-full overflow-hidden bg-secondary ${
-          pickingFocus ? "cursor-crosshair ring-1 ring-foreground" : ""
+          isSelectable ? "cursor-pointer" : showDot ? "cursor-crosshair" : ""
         }`}
       >
         {frame.imageUrl ? (
@@ -160,46 +200,36 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
           </div>
         )}
 
-        {/* focus marker (custom point) */}
-        {frame.imageUrl && hasCustomFocus && (
-          <>
-            <FocusMarker x={frame.focusX!} y={frame.focusY!} />
-            <button
-              type="button"
-              onClick={clearFocus}
-              aria-label="Clear focus point"
-              className="absolute right-2 top-2 z-10 flex h-5 w-5 items-center justify-center border border-foreground/30 bg-background/85 text-foreground/70 transition hover:text-foreground"
-              title="Clear focus point"
-            >
-              <X className="h-2.5 w-2.5" />
-            </button>
-          </>
-        )}
-
-        {/* Pick-mode hint */}
-        {pickingFocus && frame.imageUrl && (
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-between bg-foreground/90 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-background">
-            <span>Click to set focus</span>
-            <span className="opacity-70">Esc to cancel</span>
+        {/* selectable hint overlay */}
+        {isSelectable && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-center justify-center bg-foreground/85 px-2 py-1.5 text-[10px] uppercase tracking-[0.22em] text-background">
+            Click to edit motion
           </div>
         )}
 
-        {/* Inline motion menu — bottom-left of image */}
-        {frame.imageUrl && (
-          <div
-            className={`pointer-events-none absolute bottom-2 left-2 z-10 transition ${
-              pickingFocus
-                ? "opacity-0"
-                : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
-            } ${preset !== "none" || hasCustomFocus ? "!opacity-100" : ""}`}
-          >
-            <FrameMotionMenu
-              frame={frame}
-              onChange={onChange}
-              onApplyToAll={(p) => onApplyToAll?.(p)}
-              onPickCustomFocus={() => setPickingFocus(true)}
-              customFocusActive={pickingFocus}
-            />
+        {/* focus marker (custom point) */}
+        {frame.imageUrl && hasCustomFocus && (
+          <>
+            <FocusMarker x={frame.focusX!} y={frame.focusY!} draggable={!!showDot} />
+            {selected && (
+              <button
+                type="button"
+                data-no-dot
+                onClick={clearFocus}
+                aria-label="Clear focus point"
+                className="absolute right-2 top-2 z-20 flex h-5 w-5 items-center justify-center border border-foreground/30 bg-background/85 text-foreground/70 transition hover:text-foreground"
+                title="Clear focus point"
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            )}
+          </>
+        )}
+
+        {/* Drag-to-focus hint when selected without custom point */}
+        {showDot && !hasCustomFocus && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-center justify-center bg-foreground/85 px-2 py-1.5 text-[10px] uppercase tracking-[0.22em] text-background">
+            Click or drag on image to set focus
           </div>
         )}
       </div>
@@ -226,30 +256,29 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
   );
 }
 
-function FocusMarker({ x, y }: { x: number; y: number }) {
+function FocusMarker({ x, y, draggable }: { x: number; y: number; draggable?: boolean }) {
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute"
+      className="pointer-events-none absolute z-10"
       style={{
         left: `${x * 100}%`,
         top: `${y * 100}%`,
         transform: "translate(-50%, -50%)",
       }}
     >
-      {/* crosshair */}
       <span className="absolute left-1/2 top-1/2 h-px w-4 -translate-x-1/2 -translate-y-1/2 bg-background/90 mix-blend-difference" />
       <span className="absolute left-1/2 top-1/2 h-4 w-px -translate-x-1/2 -translate-y-1/2 bg-background/90 mix-blend-difference" />
-      {/* ring */}
-      <span className="block h-3 w-3 rounded-full border border-background/90 mix-blend-difference [animation:focusPulse_220ms_ease-out_1]" />
-      {/* inner dot */}
+      <span
+        className={`block h-3 w-3 rounded-full border border-background/90 mix-blend-difference ${
+          draggable ? "[animation:focusPulse_220ms_ease-out_1]" : ""
+        }`}
+      />
       <span className="absolute left-1/2 top-1/2 h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-background/90 mix-blend-difference" />
     </div>
   );
 }
 
-/* --------------------------------------------------------------------- */
-/*  Preview transform (visual-only — Remotion does the real thing)       */
 /* --------------------------------------------------------------------- */
 
 function intensityScale(i: MotionIntensity) {
@@ -274,7 +303,6 @@ function getPreviewTransform(
   fx?: number,
   fy?: number,
 ): React.CSSProperties {
-  // CSS keyframes (defined in styles.css) read these custom props
   const scale = intensityScale(intensity);
   const origin = focusOrigin(fp, fx, fy);
   const style: React.CSSProperties & Record<string, string> = {
@@ -287,14 +315,9 @@ function getPreviewTransform(
     ["--to-y"]: "0%",
   };
   switch (preset) {
-    case "none":
-      break;
-    case "zoom_in":
-      style["--to-scale"] = String(scale);
-      break;
-    case "zoom_out":
-      style["--from-scale"] = String(scale);
-      break;
+    case "none": break;
+    case "zoom_in": style["--to-scale"] = String(scale); break;
+    case "zoom_out": style["--from-scale"] = String(scale); break;
     case "pan_left":
       style["--from-x"] = "3%"; style["--to-x"] = "-3%"; style["--from-scale"] = String(scale); style["--to-scale"] = String(scale);
       break;
@@ -308,8 +331,7 @@ function getPreviewTransform(
       style["--from-y"] = "-3%"; style["--to-y"] = "3%"; style["--from-scale"] = String(scale); style["--to-scale"] = String(scale);
       break;
     case "focus_zoom":
-      style["--to-scale"] = String(scale);
-      break;
+      style["--to-scale"] = String(scale); break;
   }
   return style;
 }
@@ -366,10 +388,7 @@ function InlineEdit({ value, onChange, placeholder, className, multiline, loadin
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              setDraft(value);
-              setEditing(false);
-            }
+            if (e.key === "Escape") { setDraft(value); setEditing(false); }
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) commit();
           }}
           rows={3}
@@ -385,10 +404,7 @@ function InlineEdit({ value, onChange, placeholder, className, multiline, loadin
         onBlur={commit}
         onKeyDown={(e) => {
           if (e.key === "Enter") commit();
-          if (e.key === "Escape") {
-            setDraft(value);
-            setEditing(false);
-          }
+          if (e.key === "Escape") { setDraft(value); setEditing(false); }
         }}
         className={`${className} w-full border-b border-foreground/40 bg-transparent outline-none focus:border-foreground`}
       />
