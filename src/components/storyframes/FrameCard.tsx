@@ -69,6 +69,23 @@ export function FrameCard({
   const imgWrapRef = useRef<HTMLDivElement>(null);
   const dotDragRef = useRef(false);
 
+  function stopFocusDrag() {
+    dotDragRef.current = false;
+  }
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handlePointerEnd = () => stopFocusDrag();
+    window.addEventListener("pointerup", handlePointerEnd, true);
+    window.addEventListener("pointercancel", handlePointerEnd, true);
+    window.addEventListener("blur", handlePointerEnd);
+    return () => {
+      window.removeEventListener("pointerup", handlePointerEnd, true);
+      window.removeEventListener("pointercancel", handlePointerEnd, true);
+      window.removeEventListener("blur", handlePointerEnd);
+    };
+  }, []);
+
   function setFocusFromEvent(e: React.PointerEvent | PointerEvent) {
     if (!imgWrapRef.current) return;
     const rect = imgWrapRef.current.getBoundingClientRect();
@@ -77,22 +94,18 @@ export function FrameCard({
     onChange({ focusX: x, focusY: y });
   }
   function onImagePointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    if (!editing) return;
+    if (!editing || zoom === "none" || e.button !== 0) return;
     if ((e.target as HTMLElement).closest("[data-no-dot]")) return;
     dotDragRef.current = true;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     setFocusFromEvent(e);
   }
   function onImagePointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    if (!dotDragRef.current) return;
+    if (!dotDragRef.current || (typeof e.buttons === "number" && e.buttons === 0)) return;
     setFocusFromEvent(e);
   }
-  function onImagePointerUp(e: React.PointerEvent<HTMLDivElement>) {
+  function onImagePointerUp() {
     if (!dotDragRef.current) return;
-    dotDragRef.current = false;
-    try {
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch {}
+    stopFocusDrag();
   }
 
   function resetMotion() {
@@ -184,7 +197,7 @@ export function FrameCard({
         onPointerUp={onImagePointerUp}
         onPointerCancel={onImagePointerUp}
         className={`group/img relative aspect-[4/3] w-full overflow-hidden bg-secondary ${
-          editing ? "cursor-crosshair" : ""
+          editing && zoom !== "none" ? "cursor-crosshair" : ""
         }`}
       >
         {frame.imageUrl ? (
