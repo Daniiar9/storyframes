@@ -340,13 +340,45 @@ export default function Home() {
     const focusX = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
     const focusY = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
 
+    const motion = getFrameMotion(frame);
     updateFrame(frame.id, {
       focusX,
       focusY,
-      motionPreset: "focus_zoom",
+      motionPreset: zoomToPreset(motion.zoom === "none" ? "in" : motion.zoom, motion.pan, true),
+      zoom: motion.zoom === "none" ? "in" : motion.zoom,
       motionIntensity: frame.motionIntensity ?? DEFAULT_MOTION_INTENSITY,
     });
-    setStatus("Focus point set.");
+    setStatus("Focus locked. Adjust zoom, pan, or intensity.");
+  }
+
+  function setZoom(frame: StoryFrame, zoom: Zoom) {
+    const motion = getFrameMotion(frame);
+    // Switching zoom direction always clears the previous focus so the
+    // user explicitly retargets the area to zoom into/out of.
+    const clearFocus = zoom !== "none" && zoom !== motion.zoom;
+    updateFrame(frame.id, {
+      zoom,
+      motionPreset: zoomToPreset(zoom, motion.pan, !clearFocus && hasFocusTarget(frame)),
+      ...(clearFocus ? { focusX: undefined, focusY: undefined } : null),
+    });
+    if (zoom !== "none") {
+      setStatus(`Click on image to target zoom ${zoom}.`);
+    } else {
+      setStatus("Zoom cleared.");
+    }
+  }
+
+  function setPan(frame: StoryFrame, pan: Pan) {
+    const motion = getFrameMotion(frame);
+    updateFrame(frame.id, {
+      pan,
+      motionPreset: zoomToPreset(motion.zoom, pan, hasFocusTarget(frame)),
+    });
+    setStatus(pan === "none" ? "Pan cleared." : `Pan set: ${pan}.`);
+  }
+
+  function setIntensity(frame: StoryFrame, motionIntensity: MotionIntensity) {
+    updateFrame(frame.id, { motionIntensity });
   }
 
   async function generateStory() {
