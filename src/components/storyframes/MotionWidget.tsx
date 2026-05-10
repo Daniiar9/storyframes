@@ -125,7 +125,6 @@ export function MotionWidget({
 
   const preset: MotionPreset = selected?.motionPreset ?? "none";
   const intensity: MotionIntensity = selected?.motionIntensity ?? "subtle";
-  const focus: FocusPoint = selected?.focusPoint ?? "center";
   const hasCustom = selected?.focusX != null && selected?.focusY != null;
 
   const motionCount = imageFrames.filter(
@@ -268,7 +267,6 @@ export function MotionWidget({
             index={selectedIndex}
             preset={preset}
             intensity={intensity}
-            focus={focus}
             hasCustom={hasCustom}
             patch={(p) => patch(selected.id, p)}
             applyToAll={applyToAll}
@@ -277,6 +275,10 @@ export function MotionWidget({
               setSelecting(true);
             }}
             onClose={() => setSelectedId(null)}
+            onNext={() => {
+              setSelectedId(null);
+              setSelecting(true);
+            }}
             onClearMotion={() =>
               patch(selected.id, {
                 motionPreset: undefined,
@@ -345,24 +347,24 @@ function SelectedPanel({
   index,
   preset,
   intensity,
-  focus,
   hasCustom,
   patch,
   applyToAll,
   onSwitch,
   onClose,
+  onNext,
   onClearMotion,
 }: {
   frame: Frame;
   index: number;
   preset: MotionPreset;
   intensity: MotionIntensity;
-  focus: FocusPoint;
   hasCustom: boolean | undefined;
   patch: (p: Partial<Frame>) => void;
   applyToAll: (p: Partial<Frame>) => void;
   onSwitch: () => void;
   onClose: () => void;
+  onNext: () => void;
   onClearMotion: () => void;
 }) {
   const [appliedAt, setAppliedAt] = useState(0);
@@ -416,84 +418,82 @@ function SelectedPanel({
             </Pill>
           ))}
         </div>
-      </Section>
-
-      <Section label="Intensity">
-        <div className="grid grid-cols-3 gap-1">
-          {INTENSITIES.map((i) => (
-            <Pill
-              key={i}
-              active={intensity === i}
-              disabled={preset === "none"}
-              onClick={() => patch({ motionIntensity: i })}
-            >
-              {cap(i)}
-            </Pill>
-          ))}
-        </div>
-      </Section>
-
-      <Section label="Focus">
-        <div className="grid grid-cols-3 gap-1">
-          {FOCUSES.map((f) => (
-            <Pill
-              key={f}
-              active={!hasCustom && focus === f}
-              onClick={() =>
-                patch({
-                  focusPoint: f,
-                  focusX: undefined,
-                  focusY: undefined,
-                })
-              }
-            >
-              {cap(f)}
-            </Pill>
-          ))}
-        </div>
-        <p className="mt-2 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          <Crosshair className="h-3 w-3" />
-          {hasCustom ? "Custom point set — drag dot on image" : "Or drag the dot on the image"}
-        </p>
+        {preset !== "none" && (
+          <p className="mt-2 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            <Crosshair className="h-3 w-3" />
+            {hasCustom ? "Focus set — drag dot to adjust" : "Click on the image to set focus"}
+          </p>
+        )}
         {hasCustom && (
           <button
             type="button"
             onClick={() => patch({ focusX: undefined, focusY: undefined })}
             className="mt-1 block text-[10px] uppercase tracking-[0.18em] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
           >
-            Clear custom focus
+            Clear focus point
           </button>
         )}
       </Section>
 
+      <Section label="Intensity">
+        <div className={preset === "none" ? "opacity-30" : ""}>
+          <Slider
+            value={[INTENSITY_STEPS.indexOf(intensity)]}
+            min={0}
+            max={2}
+            step={1}
+            disabled={preset === "none"}
+            onValueChange={([v]) =>
+              patch({ motionIntensity: INTENSITY_STEPS[v] ?? "subtle" })
+            }
+          />
+          <div className="mt-1.5 flex justify-between text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+            {INTENSITY_STEPS.map((s) => (
+              <span
+                key={s}
+                className={intensity === s && preset !== "none" ? "text-foreground" : ""}
+              >
+                {cap(s)}
+              </span>
+            ))}
+          </div>
+        </div>
+      </Section>
+
       {/* Footer actions */}
       <div className="flex items-center justify-between gap-2 border-t border-foreground/15 p-2">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onClearMotion}
+            className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground"
+          >
+            Reset
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              applyToAll({
+                motionPreset: preset,
+                motionIntensity: intensity,
+                focusX: undefined,
+                focusY: undefined,
+              });
+              setAppliedAt(Date.now());
+            }}
+            className={`text-[10px] uppercase tracking-[0.18em] transition ${
+              justApplied ? "text-primary" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {justApplied ? "Applied to all ✓" : "Apply to all"}
+          </button>
+        </div>
         <button
           type="button"
-          onClick={onClearMotion}
-          className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground"
+          onClick={onNext}
+          className="bg-primary px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-primary-foreground transition hover:bg-primary/85"
         >
-          Reset frame
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            applyToAll({
-              motionPreset: preset,
-              motionIntensity: intensity,
-              focusPoint: focus,
-              focusX: undefined,
-              focusY: undefined,
-            });
-            setAppliedAt(Date.now());
-          }}
-          className={`px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] transition ${
-            justApplied
-              ? "bg-primary text-primary-foreground"
-              : "bg-foreground text-background hover:bg-foreground/85"
-          }`}
-        >
-          {justApplied ? "Applied ✓" : "Apply to all"}
+          Apply & pick next
         </button>
       </div>
     </div>
