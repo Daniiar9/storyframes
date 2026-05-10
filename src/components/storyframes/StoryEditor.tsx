@@ -18,7 +18,6 @@ import { FrameCard } from "./FrameCard";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   exportStory,
-  hasMotion,
   hasRenderableMotion,
   motionStyle,
   nextSuggestion,
@@ -526,7 +525,6 @@ function StoryPlayer({ frames, onClose }: { frames: Frame[]; onClose: () => void
 
   if (playable.length === 0) return null;
   const f = playable[Math.min(idx, playable.length - 1)];
-  const motionOn = hasMotion(f);
   const renderableMotionOn = hasRenderableMotion(f);
 
   return (
