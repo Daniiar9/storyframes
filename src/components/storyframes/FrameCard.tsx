@@ -1,15 +1,6 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  GripVertical,
-  X,
-  Sparkles,
-  ChevronDown,
-  ArrowLeft,
-  ArrowRight,
-  ArrowUp,
-  ArrowDown,
-} from "lucide-react";
+import { GripVertical, X, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type {
   Frame,
@@ -18,6 +9,7 @@ import type {
   MotionPreset,
 } from "@/lib/storyframes";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useMotionPick } from "./MotionPickContext";
 
 interface Props {
   frame: Frame;
@@ -44,9 +36,10 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
   const focusPoint: FocusPoint = frame.focusPoint ?? "center";
   const hasCustomFocus = frame.focusX != null && frame.focusY != null;
 
-  const [motionOpen, setMotionOpen] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
   const imgWrapRef = useRef<HTMLDivElement>(null);
+  const { armed, applyTo } = useMotionPick();
+  const isPickable = !!armed && !!frame.imageUrl;
 
   // Re-trigger the in-card preview animation whenever motion settings change
   useEffect(() => {
@@ -55,19 +48,19 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
   }, [preset, intensity, focusPoint, frame.focusX, frame.focusY, frame.imageUrl]);
 
   function handleImageClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (!imgWrapRef.current) return;
-    const rect = imgWrapRef.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const y = (e.clientY - rect.top) / rect.height;
-    onChange({
-      focusX: clamp01(x),
-      focusY: clamp01(y),
-      motionPreset: "focus_zoom",
-      motionIntensity: frame.motionIntensity ?? "subtle",
-    });
+    if (!armed || !imgWrapRef.current) return;
+    if (armed.kind === "customFocus") {
+      const rect = imgWrapRef.current.getBoundingClientRect();
+      const x = clamp01((e.clientX - rect.left) / rect.width);
+      const y = clamp01((e.clientY - rect.top) / rect.height);
+      applyTo(frame.id, { focusX: x, focusY: y });
+    } else {
+      applyTo(frame.id);
+    }
   }
 
-  function resetFocus() {
+  function clearFocus(e: React.MouseEvent) {
+    e.stopPropagation();
     onChange({ focusX: undefined, focusY: undefined });
   }
 
@@ -75,7 +68,9 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
     <div
       ref={setNodeRef}
       style={style}
-      className="group relative flex flex-col bg-card"
+      className={`group relative flex flex-col bg-card transition ${
+        isPickable ? "ring-1 ring-foreground/30 hover:ring-foreground" : ""
+      }`}
     >
       {/* number + drag */}
       <div className="flex items-center justify-between border-b border-foreground/15 px-3 py-2">
@@ -136,9 +131,8 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
         data-no-dnd
         onClick={frame.imageUrl ? handleImageClick : undefined}
         className={`group/img relative aspect-[4/3] w-full overflow-hidden bg-secondary ${
-          frame.imageUrl ? "cursor-crosshair" : ""
+          isPickable ? "cursor-crosshair" : ""
         }`}
-        title={frame.imageUrl ? "Click to set focus point" : undefined}
       >
         {frame.imageUrl ? (
           <img
@@ -157,16 +151,20 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
           </div>
         )}
 
-        {/* helper text — only on hover, only when image is present */}
-        {frame.imageUrl && (
-          <span className="pointer-events-none absolute bottom-2 left-2 border border-foreground/30 bg-background/80 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.18em] text-foreground/70 opacity-0 transition group-hover/img:opacity-100">
-            Click image to set focus
-          </span>
-        )}
-
-        {/* focus marker */}
+        {/* focus marker (custom point) */}
         {frame.imageUrl && hasCustomFocus && (
-          <FocusMarker x={frame.focusX!} y={frame.focusY!} />
+          <>
+            <FocusMarker x={frame.focusX!} y={frame.focusY!} />
+            <button
+              type="button"
+              onClick={clearFocus}
+              aria-label="Clear focus point"
+              className="absolute right-2 top-2 z-10 flex h-5 w-5 items-center justify-center border border-foreground/30 bg-background/85 text-foreground/70 transition hover:text-foreground"
+              title="Clear focus point"
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+          </>
         )}
       </div>
 
@@ -188,24 +186,6 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
           loading={loading}
         />
       </div>
-
-      {/* MOTION section */}
-      {frame.imageUrl && (
-        <MotionSection
-          open={motionOpen}
-          onToggle={() => setMotionOpen((v) => !v)}
-          preset={preset}
-          intensity={intensity}
-          focusPoint={focusPoint}
-          hasCustomFocus={hasCustomFocus}
-          onPreset={(p) => onChange({ motionPreset: p })}
-          onIntensity={(i) => onChange({ motionIntensity: i })}
-          onFocusPoint={(fp) =>
-            onChange({ focusPoint: fp, focusX: undefined, focusY: undefined })
-          }
-          onResetFocus={resetFocus}
-        />
-      )}
     </div>
   );
 }
