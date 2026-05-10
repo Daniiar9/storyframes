@@ -707,38 +707,65 @@ export default function Home() {
                   {String(Math.max(1, frames.findIndex((frame) => frame.id === selectedFrame.id) + 1)).padStart(2, "0")}
                 </span>
               </div>
-              <div className="mb-3">
-                <div className="relative overflow-hidden border border-stone-300 bg-stone-950">
-                  <img
-                    src={selectedFrame.imageDataUrl}
-                    alt=""
-                    data-testid="focus-image"
-                    className="block max-h-56 w-full cursor-crosshair object-contain"
-                    onClick={(event) => setCustomFocus(selectedFrame, event)}
-                  />
-                  {typeof selectedFrame.focusX === "number" && typeof selectedFrame.focusY === "number" ? (
-                    <span
-                      data-testid="focus-marker"
-                      className="pointer-events-none absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 border border-white/80 bg-[#346766]/70 shadow-[0_0_0_3px_rgba(52,103,102,0.22)]"
-                      style={{ left: `${selectedFrame.focusX * 100}%`, top: `${selectedFrame.focusY * 100}%` }}
-                    />
-                  ) : null}
-                </div>
-                <div className="mt-2 flex items-center justify-between gap-3">
-                  <p className="font-mono text-[10px] uppercase text-stone-500">
-                    Click image to set focus
-                  </p>
-                  {typeof selectedFrame.focusX === "number" && typeof selectedFrame.focusY === "number" ? (
-                    <button
-                      type="button"
-                      onClick={() => updateFrame(selectedFrame.id, { focusX: undefined, focusY: undefined })}
-                      className="cursor-pointer font-mono text-[10px] font-semibold uppercase text-stone-950 underline underline-offset-4"
-                    >
-                      Reset focus
-                    </button>
-                  ) : null}
-                </div>
-              </div>
+              {(() => {
+                const motion = getFrameMotion(selectedFrame);
+                const hasFocus = hasFocusTarget(selectedFrame);
+                const awaitingFocus = motion.zoom !== "none" && !hasFocus;
+                return (
+                  <div className="mb-3">
+                    <div className="relative overflow-hidden border border-stone-300 bg-stone-950">
+                      <img
+                        src={selectedFrame.imageDataUrl}
+                        alt=""
+                        data-testid="focus-image"
+                        className={`block max-h-56 w-full object-contain ${
+                          motion.zoom !== "none" ? "cursor-crosshair" : "cursor-default"
+                        }`}
+                        onClick={(event) => {
+                          if (motion.zoom === "none") {
+                            setStatus("Pick Zoom In or Out first, then click to target.");
+                            return;
+                          }
+                          setCustomFocus(selectedFrame, event);
+                        }}
+                      />
+                      {hasFocus ? (
+                        <span
+                          data-testid="focus-marker"
+                          className="pointer-events-none absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 border-2 border-white bg-[#346766]/60 shadow-[0_0_0_3px_rgba(52,103,102,0.3)]"
+                          style={{ left: `${(selectedFrame.focusX ?? 0.5) * 100}%`, top: `${(selectedFrame.focusY ?? 0.5) * 100}%` }}
+                        />
+                      ) : null}
+                      {awaitingFocus ? (
+                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-stone-950/55">
+                          <div className="flex items-center gap-2 border border-white bg-stone-950/80 px-3 py-2 font-mono text-[10px] font-semibold uppercase text-white">
+                            <Crosshair size={14} />
+                            Click on image to target zoom {motion.zoom}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <p className="font-mono text-[10px] uppercase text-stone-500">
+                        {motion.zoom === "none"
+                          ? "Choose zoom in/out to target an area"
+                          : hasFocus
+                            ? "Focus locked"
+                            : "Awaiting focus target"}
+                      </p>
+                      {hasFocus ? (
+                        <button
+                          type="button"
+                          onClick={() => updateFrame(selectedFrame.id, { focusX: undefined, focusY: undefined })}
+                          className="cursor-pointer font-mono text-[10px] font-semibold uppercase text-stone-950 underline underline-offset-4"
+                        >
+                          Reset focus
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })()}
               <label
                 className="mb-1 block font-mono text-[10px] font-semibold uppercase text-stone-500"
                 htmlFor="frame-title"
@@ -765,36 +792,12 @@ export default function Home() {
                 placeholder="Generated caption appears here"
                 className="min-h-24 w-full resize-none border border-stone-300 bg-[#fbfaf6] p-3 text-sm leading-6 outline-none transition focus:border-stone-950"
               />
-              <div className="mt-4 border-t border-stone-300 pt-4">
-                <h3 className="mb-3 font-mono text-[10px] font-semibold uppercase text-stone-500">
-                  Motion
-                </h3>
-                <div className="grid grid-cols-1 gap-3">
-                  <SelectField
-                    id="motion-preset"
-                    label="Motion"
-                    value={getFrameMotion(selectedFrame).motionPreset}
-                    options={motionPresetOptions}
-                    onChange={(motionPreset) => updateFrame(selectedFrame.id, { motionPreset })}
-                  />
-                  <SelectField
-                    id="motion-intensity"
-                    label="Intensity"
-                    value={getFrameMotion(selectedFrame).motionIntensity}
-                    options={motionIntensityOptions}
-                    onChange={(motionIntensity) => updateFrame(selectedFrame.id, { motionIntensity })}
-                  />
-                  <SelectField
-                    id="focus-point"
-                    label="Focus"
-                    value={getFrameMotion(selectedFrame).focusPoint}
-                    options={focusPointOptions}
-                    onChange={(focusPoint) =>
-                      updateFrame(selectedFrame.id, { focusPoint, focusX: undefined, focusY: undefined })
-                    }
-                  />
-                </div>
-              </div>
+              <MotionControls
+                frame={selectedFrame}
+                onSetZoom={(zoom) => setZoom(selectedFrame, zoom)}
+                onSetPan={(pan) => setPan(selectedFrame, pan)}
+                onSetIntensity={(intensity) => setIntensity(selectedFrame, intensity)}
+              />
             </section>
           ) : (
             <section className="flex min-h-96 flex-col items-center justify-center border border-dashed border-stone-300 bg-[#f7f5ef] p-8 text-center">
