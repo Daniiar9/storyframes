@@ -226,6 +226,93 @@ function SelectField<T extends string>({
   );
 }
 
+const PILL_BASE =
+  "inline-flex h-9 items-center justify-center gap-1.5 border px-3 font-mono text-[10px] font-semibold uppercase transition cursor-pointer";
+const PILL_ON = "border-stone-950 bg-stone-950 text-white";
+const PILL_OFF = "border-stone-300 bg-[#fbfaf6] text-stone-700 hover:border-stone-950";
+
+function MotionControls({
+  frame,
+  onSetZoom,
+  onSetPan,
+  onSetIntensity,
+}: {
+  frame: StoryFrame;
+  onSetZoom: (zoom: Zoom) => void;
+  onSetPan: (pan: Pan) => void;
+  onSetIntensity: (intensity: MotionIntensity) => void;
+}) {
+  const motion = getFrameMotion(frame);
+  const zoomBtn = (value: Zoom, label: string, Icon: typeof ZoomIn) => (
+    <button
+      key={value}
+      type="button"
+      onClick={() => onSetZoom(value)}
+      className={`${PILL_BASE} ${motion.zoom === value ? PILL_ON : PILL_OFF}`}
+    >
+      <Icon size={13} />
+      {label}
+    </button>
+  );
+  const panBtn = (value: Pan, Icon: typeof ArrowLeft, label: string) => (
+    <button
+      key={value}
+      type="button"
+      title={label}
+      aria-label={`Pan ${label.toLowerCase()}`}
+      onClick={() => onSetPan(value)}
+      className={`${PILL_BASE} h-9 w-9 px-0 ${motion.pan === value ? PILL_ON : PILL_OFF}`}
+    >
+      <Icon size={14} />
+    </button>
+  );
+
+  return (
+    <div className="mt-4 space-y-4 border-t border-stone-300 pt-4">
+      <div>
+        <h3 className="mb-2 font-mono text-[10px] font-semibold uppercase text-stone-500">Zoom</h3>
+        <div className="flex flex-wrap gap-2">
+          {zoomBtn("none", "None", Ban)}
+          {zoomBtn("in", "In", ZoomIn)}
+          {zoomBtn("out", "Out", ZoomOut)}
+        </div>
+      </div>
+      <div>
+        <h3 className="mb-2 font-mono text-[10px] font-semibold uppercase text-stone-500">Pan</h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onSetPan("none")}
+            className={`${PILL_BASE} ${motion.pan === "none" ? PILL_ON : PILL_OFF}`}
+          >
+            <Ban size={13} />
+            None
+          </button>
+          {panBtn("left", ArrowLeft, "Left")}
+          {panBtn("right", ArrowRight, "Right")}
+          {panBtn("up", ArrowUp, "Up")}
+          {panBtn("down", ArrowDown, "Down")}
+        </div>
+      </div>
+      <div>
+        <h3 className="mb-2 font-mono text-[10px] font-semibold uppercase text-stone-500">Intensity</h3>
+        <div className="flex flex-wrap gap-2">
+          {motionIntensityOptions.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onSetIntensity(opt.value)}
+              className={`${PILL_BASE} ${motion.motionIntensity === opt.value ? PILL_ON : PILL_OFF}`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 async function readImageFile(file: File) {
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
