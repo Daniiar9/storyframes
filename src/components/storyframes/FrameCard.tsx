@@ -109,8 +109,8 @@ export function FrameCard({
       ref={setNodeRef}
       style={style}
       className={`group relative flex flex-col bg-card transition ${
-        selected ? "ring-1 ring-foreground" : ""
-      } ${isSelectable ? "ring-1 ring-foreground/30 hover:ring-foreground" : ""}`}
+        selected ? "ring-2 ring-primary shadow-[0_0_0_4px_color-mix(in_oklab,var(--primary)_18%,transparent)]" : ""
+      } ${isSelectable ? "ring-2 ring-primary/40 hover:ring-primary cursor-pointer" : ""}`}
     >
       {/* number + drag */}
       <div className="flex items-center justify-between border-b border-foreground/15 px-3 py-2">
@@ -124,7 +124,7 @@ export function FrameCard({
             </span>
           )}
           {selected && (
-            <span className="bg-foreground px-1.5 py-0.5 text-[10px] uppercase tracking-[0.18em] text-background">
+            <span className="bg-primary px-1.5 py-0.5 text-[10px] uppercase tracking-[0.18em] text-primary-foreground">
               Editing motion
             </span>
           )}
@@ -202,7 +202,7 @@ export function FrameCard({
 
         {/* selectable hint overlay */}
         {isSelectable && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-center justify-center bg-foreground/85 px-2 py-1.5 text-[10px] uppercase tracking-[0.22em] text-background">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-center justify-center bg-primary/90 px-2 py-1.5 text-[10px] uppercase tracking-[0.22em] text-primary-foreground">
             Click to edit motion
           </div>
         )}
