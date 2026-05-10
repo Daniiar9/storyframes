@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Plus, X, HelpCircle, Crosshair, ChevronDown } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
 import type {
-  FocusPoint,
   Frame,
   MotionIntensity,
   MotionPreset,
@@ -28,10 +28,8 @@ const PRESETS: MotionPreset[] = [
   "pan_right",
   "pan_up",
   "pan_down",
-  "focus_zoom",
 ];
-const INTENSITIES: MotionIntensity[] = ["subtle", "medium", "strong"];
-const FOCUSES: FocusPoint[] = ["center", "top", "bottom", "left", "right"];
+const INTENSITY_STEPS: MotionIntensity[] = ["subtle", "medium", "strong"];
 
 interface Props {
   frames: Frame[];
