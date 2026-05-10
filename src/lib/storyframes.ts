@@ -1,5 +1,19 @@
 export type FrameKind = "intro" | "image" | "outro";
 
+export type MotionPreset =
+  | "none"
+  | "zoom_in"
+  | "zoom_out"
+  | "pan_left"
+  | "pan_right"
+  | "pan_up"
+  | "pan_down"
+  | "focus_zoom";
+
+export type MotionIntensity = "subtle" | "medium" | "strong";
+
+export type FocusPoint = "center" | "top" | "bottom" | "left" | "right";
+
 export interface Frame {
   id: string;
   kind: FrameKind;
@@ -8,6 +22,11 @@ export interface Frame {
   title: string;
   caption: string;
   generated: boolean;
+  motionPreset?: MotionPreset;
+  motionIntensity?: MotionIntensity;
+  focusPoint?: FocusPoint;
+  focusX?: number;
+  focusY?: number;
 }
 
 const TITLE_POOL = [
