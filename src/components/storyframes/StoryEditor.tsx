@@ -15,6 +15,7 @@ import {
 import { Sparkles, Download, Wand2, RotateCcw, ArrowUp, Pencil, X } from "lucide-react";
 import { Uploader } from "./Uploader";
 import { FrameCard } from "./FrameCard";
+import { MotionWidget } from "./MotionWidget";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   exportStory,
@@ -31,6 +32,8 @@ export function StoryEditor() {
   const [generating, setGenerating] = useState<Set<string>>(new Set());
   const [hasGenerated, setHasGenerated] = useState(false);
   const [promptOpen, setPromptOpen] = useState(true);
+  const [selectedMotionId, setSelectedMotionId] = useState<string | null>(null);
+  const [selectingMotion, setSelectingMotion] = useState(false);
 
   const imageFrames = frames.filter((f) => f.kind === "image");
 
@@ -297,7 +300,12 @@ export function StoryEditor() {
                       onRemove={() => removeFrame(f.id)}
                       onRegenerate={() => regenerateOne(f.id)}
                       loading={generating.has(f.id)}
-                      onApplyToAll={applyMotionToAll}
+                      selecting={selectingMotion}
+                      selected={selectedMotionId === f.id}
+                      onSelect={() => {
+                        setSelectedMotionId(f.id);
+                        setSelectingMotion(false);
+                      }}
                     />
                   ))}
                   <Uploader onFiles={addFiles} variant="compact" />
@@ -344,6 +352,18 @@ export function StoryEditor() {
             />
           </div>
         </div>
+      )}
+
+      {frames.some((f) => f.imageUrl) && (
+        <MotionWidget
+          frames={frames}
+          selectedId={selectedMotionId}
+          setSelectedId={setSelectedMotionId}
+          selecting={selectingMotion}
+          setSelecting={setSelectingMotion}
+          patch={patchFrame}
+          applyToAll={applyMotionToAll}
+        />
       )}
     </div>
     </TooltipProvider>
