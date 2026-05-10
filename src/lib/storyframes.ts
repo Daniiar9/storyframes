@@ -1,18 +1,7 @@
 export type FrameKind = "intro" | "image" | "outro";
 
-export type MotionPreset =
-  | "none"
-  | "zoom_in"
-  | "zoom_out"
-  | "pan_left"
-  | "pan_right"
-  | "pan_up"
-  | "pan_down"
-  | "focus_zoom";
-
-export type MotionIntensity = "subtle" | "medium" | "strong";
-
-export type FocusPoint = "center" | "top" | "bottom" | "left" | "right";
+export type ZoomDir = "none" | "in" | "out";
+export type PanDir = "none" | "left" | "right" | "up" | "down";
 
 export interface Frame {
   id: string;
@@ -22,9 +11,11 @@ export interface Frame {
   title: string;
   caption: string;
   generated: boolean;
-  motionPreset?: MotionPreset;
-  motionIntensity?: MotionIntensity;
-  focusPoint?: FocusPoint;
+  motionZoom?: ZoomDir;
+  motionPan?: PanDir;
+  /** 0..100 — how strong the motion is */
+  motionIntensity?: number;
+  /** Custom focus point for zoom origin */
   focusX?: number;
   focusY?: number;
 }
@@ -112,4 +103,55 @@ export function exportStory(frames: Frame[], context: string) {
     lines.push("");
   });
   return lines.join("\n");
+}
+
+/* ------------------------------------------------------------------ */
+/* Motion → CSS variables for the preview animation (loops via CSS)    */
+/* ------------------------------------------------------------------ */
+
+export function hasMotion(f: Pick<Frame, "motionZoom" | "motionPan">) {
+  return (
+    (f.motionZoom && f.motionZoom !== "none") ||
+    (f.motionPan && f.motionPan !== "none")
+  );
+}
+
+export function motionStyle(f: Frame): React.CSSProperties {
+  const zoom: ZoomDir = f.motionZoom ?? "none";
+  const pan: PanDir = f.motionPan ?? "none";
+  const i = Math.max(0, Math.min(100, f.motionIntensity ?? 50)) / 100;
+
+  const zoomDelta = 0.04 + i * 0.18; // 1.04 → 1.22
+  const panDelta = (3 + i * 8).toFixed(2) + "%"; // 3% → 11%
+
+  let fromScale = 1, toScale = 1;
+  if (zoom === "in") { fromScale = 1; toScale = 1 + zoomDelta; }
+  else if (zoom === "out") { fromScale = 1 + zoomDelta; toScale = 1; }
+
+  let fromX = "0%", toX = "0%", fromY = "0%", toY = "0%";
+  if (pan === "left") { fromX = panDelta; toX = `-${panDelta}`; }
+  else if (pan === "right") { fromX = `-${panDelta}`; toX = panDelta; }
+  else if (pan === "up") { fromY = panDelta; toY = `-${panDelta}`; }
+  else if (pan === "down") { fromY = `-${panDelta}`; toY = panDelta; }
+
+  // If only panning (no zoom), keep a slight scale so edges don't reveal
+  if (zoom === "none" && pan !== "none") {
+    fromScale = 1.08;
+    toScale = 1.08;
+  }
+
+  const origin =
+    f.focusX != null && f.focusY != null
+      ? `${(f.focusX * 100).toFixed(2)}% ${(f.focusY * 100).toFixed(2)}%`
+      : "50% 50%";
+
+  return {
+    transformOrigin: origin,
+    ["--from-scale" as never]: String(fromScale),
+    ["--to-scale" as never]: String(toScale),
+    ["--from-x" as never]: fromX,
+    ["--to-x" as never]: toX,
+    ["--from-y" as never]: fromY,
+    ["--to-y" as never]: toY,
+  } as React.CSSProperties;
 }
