@@ -164,7 +164,7 @@
   height: 1px;
 }
 
-/* Frame in-card preview animation (visual stub for motion presets) */
+/* Frame in-card preview animation (loops while motion is active) */
 @keyframes framePreview {
   0% {
     transform: scale(var(--from-scale, 1)) translate(var(--from-x, 0%), var(--from-y, 0%));
@@ -172,6 +172,10 @@
   100% {
     transform: scale(var(--to-scale, 1)) translate(var(--to-x, 0%), var(--to-y, 0%));
   }
+}
+.frame-preview-anim {
+  animation: framePreview 3.6s ease-in-out infinite alternate;
+  will-change: transform;
 }
 
 @keyframes focusPulse {
@@ -182,4 +186,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   @keyframes framePreview { 0%, 100% { transform: none; } }
+  .frame-preview-anim { animation: none !important; }
 }

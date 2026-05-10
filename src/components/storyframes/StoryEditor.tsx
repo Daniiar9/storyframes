@@ -12,13 +12,14 @@ import {
   arrayMove,
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Sparkles, Download, Wand2, RotateCcw, ArrowUp, Pencil, X } from "lucide-react";
+import { Sparkles, Download, Wand2, RotateCcw, ArrowUp, Pencil, X, Play, Pause, ChevronLeft, ChevronRight } from "lucide-react";
 import { Uploader } from "./Uploader";
 import { FrameCard } from "./FrameCard";
-import { MotionWidget } from "./MotionWidget";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   exportStory,
+  hasMotion,
+  motionStyle,
   nextSuggestion,
   uid,
   type Frame,
@@ -32,8 +33,7 @@ export function StoryEditor() {
   const [generating, setGenerating] = useState<Set<string>>(new Set());
   const [hasGenerated, setHasGenerated] = useState(false);
   const [promptOpen, setPromptOpen] = useState(true);
-  const [selectedMotionId, setSelectedMotionId] = useState<string | null>(null);
-  const [selectingMotion, setSelectingMotion] = useState(false);
+  const [playing, setPlaying] = useState(false);
 
   const imageFrames = frames.filter((f) => f.kind === "image");
 
@@ -210,6 +210,19 @@ export function StoryEditor() {
                 <TooltipContent>Clear all frames and start over</TooltipContent>
               </Tooltip>
             )}
+            {hasGenerated && imageFrames.length > 0 && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setPlaying(true)}
+                    className="inline-flex items-center gap-1.5 border border-primary bg-primary px-3 py-2 text-xs uppercase tracking-[0.18em] text-primary-foreground transition hover:bg-primary/85"
+                  >
+                    <Play className="h-3.5 w-3.5" /> Animate
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Play the full story</TooltipContent>
+              </Tooltip>
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
@@ -299,13 +312,8 @@ export function StoryEditor() {
                       onChange={(p) => patchFrame(f.id, p)}
                       onRemove={() => removeFrame(f.id)}
                       onRegenerate={() => regenerateOne(f.id)}
+                      onApplyToAll={applyMotionToAll}
                       loading={generating.has(f.id)}
-                      selecting={selectingMotion}
-                      selected={selectedMotionId === f.id}
-                      onSelect={() => {
-                        setSelectedMotionId(f.id);
-                        setSelectingMotion(false);
-                      }}
                     />
                   ))}
                   <Uploader onFiles={addFiles} variant="compact" />
@@ -354,16 +362,8 @@ export function StoryEditor() {
         </div>
       )}
 
-      {frames.some((f) => f.imageUrl) && (
-        <MotionWidget
-          frames={frames}
-          selectedId={selectedMotionId}
-          setSelectedId={setSelectedMotionId}
-          selecting={selectingMotion}
-          setSelecting={setSelectingMotion}
-          patch={patchFrame}
-          applyToAll={applyMotionToAll}
-        />
+      {playing && (
+        <StoryPlayer frames={frames} onClose={() => setPlaying(false)} />
       )}
     </div>
     </TooltipProvider>
@@ -496,5 +496,121 @@ function Toggle({
       </span>
       <span className="uppercase tracking-[0.18em] text-muted-foreground">{label}</span>
     </label>
+  );
+}
+
+function StoryPlayer({ frames, onClose }: { frames: Frame[]; onClose: () => void }) {
+  const playable = frames.filter((f) => f.imageUrl || f.kind !== "image");
+  const [idx, setIdx] = useState(0);
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight") setIdx((i) => Math.min(playable.length - 1, i + 1));
+      if (e.key === "ArrowLeft") setIdx((i) => Math.max(0, i - 1));
+      if (e.key === " ") { e.preventDefault(); setPaused((p) => !p); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [playable.length, onClose]);
+
+  useEffect(() => {
+    if (paused) return;
+    const t = setTimeout(() => {
+      setIdx((i) => (i + 1 < playable.length ? i + 1 : i));
+    }, 4200);
+    return () => clearTimeout(t);
+  }, [idx, paused, playable.length]);
+
+  if (playable.length === 0) return null;
+  const f = playable[Math.min(idx, playable.length - 1)];
+  const motionOn = hasMotion(f);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex flex-col bg-background/95 backdrop-blur">
+      <div className="flex items-center justify-between border-b border-foreground/15 px-6 py-3">
+        <div className="flex items-baseline gap-3">
+          <span className="font-display text-sm tracking-[0.22em]">
+            {String(idx + 1).padStart(2, "0")} / {String(playable.length).padStart(2, "0")}
+          </span>
+          <span className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+            Story playback
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setPaused((p) => !p)}
+            className="inline-flex items-center gap-1.5 border border-foreground/25 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] hover:bg-accent"
+          >
+            {paused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
+            {paused ? "Play" : "Pause"}
+          </button>
+          <button
+            onClick={onClose}
+            className="inline-flex items-center gap-1.5 border border-foreground/25 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] hover:bg-accent"
+          >
+            <X className="h-3 w-3" /> Close
+          </button>
+        </div>
+      </div>
+
+      <div className="relative flex flex-1 items-center justify-center overflow-hidden">
+        <button
+          onClick={() => setIdx((i) => Math.max(0, i - 1))}
+          disabled={idx === 0}
+          className="absolute left-4 z-10 flex h-10 w-10 items-center justify-center border border-foreground/25 bg-background/80 transition hover:bg-accent disabled:opacity-30"
+          aria-label="Previous"
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+
+        <div className="relative flex h-full max-h-[80vh] w-full max-w-[1100px] flex-col items-center justify-center px-16">
+          <div className="relative aspect-[16/9] w-full overflow-hidden bg-secondary shadow-[0_24px_60px_rgba(0,0,0,0.18)]">
+            {f.imageUrl ? (
+              <img
+                key={f.id + idx}
+                src={f.imageUrl}
+                alt={f.title}
+                style={motionStyle(f)}
+                className={`h-full w-full object-cover ${motionOn ? "frame-preview-anim" : ""}`}
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center">
+                <span className="font-display text-7xl text-foreground/40">
+                  {f.kind === "intro" ? "Intro" : "End"}
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="mt-5 max-w-[800px] text-center">
+            <h3 className="font-display text-2xl">{f.title}</h3>
+            {f.caption && (
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{f.caption}</p>
+            )}
+          </div>
+        </div>
+
+        <button
+          onClick={() => setIdx((i) => Math.min(playable.length - 1, i + 1))}
+          disabled={idx === playable.length - 1}
+          className="absolute right-4 z-10 flex h-10 w-10 items-center justify-center border border-foreground/25 bg-background/80 transition hover:bg-accent disabled:opacity-30"
+          aria-label="Next"
+        >
+          <ChevronRight className="h-5 w-5" />
+        </button>
+      </div>
+
+      <div className="flex gap-1 border-t border-foreground/15 px-6 py-3">
+        {playable.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setIdx(i)}
+            className={`h-1 flex-1 transition ${i === idx ? "bg-foreground" : "bg-foreground/15 hover:bg-foreground/40"}`}
+            aria-label={`Go to frame ${i + 1}`}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
