@@ -18,7 +18,7 @@ import { FrameCard } from "./FrameCard";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   exportStory,
-  hasMotion,
+  hasRenderableMotion,
   motionStyle,
   nextSuggestion,
   uid,
@@ -525,7 +525,7 @@ function StoryPlayer({ frames, onClose }: { frames: Frame[]; onClose: () => void
 
   if (playable.length === 0) return null;
   const f = playable[Math.min(idx, playable.length - 1)];
-  const motionOn = hasMotion(f);
+  const renderableMotionOn = hasRenderableMotion(f);
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-background/95 backdrop-blur">
@@ -573,7 +573,7 @@ function StoryPlayer({ frames, onClose }: { frames: Frame[]; onClose: () => void
                 src={f.imageUrl}
                 alt={f.title}
                 style={motionStyle(f)}
-                className={`h-full w-full object-cover ${motionOn ? "frame-preview-anim" : ""}`}
+                className={`h-full w-full object-cover ${renderableMotionOn ? "frame-preview-anim" : ""}`}
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center">

@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Frame, PanDir, ZoomDir } from "@/lib/storyframes";
-import { hasMotion, motionStyle } from "@/lib/storyframes";
+import { hasMotion, hasRenderableMotion, motionStyle } from "@/lib/storyframes";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
@@ -56,9 +56,11 @@ export function FrameCard({
   const intensity = frame.motionIntensity ?? 50;
   const hasFocus = frame.focusX != null && frame.focusY != null;
   const motionOn = hasMotion(frame);
+  const previewMotionOn = hasRenderableMotion(frame);
 
   const [editing, setEditing] = useState(false);
   const [appliedAt, setAppliedAt] = useState(0);
+  const awaitingFocus = editing && zoom !== "none" && !hasFocus;
   const justApplied = appliedAt > 0 && Date.now() - appliedAt < 1500;
   useEffect(() => {
     if (!appliedAt) return;
@@ -197,7 +199,7 @@ export function FrameCard({
         onPointerUp={onImagePointerUp}
         onPointerCancel={onImagePointerUp}
         className={`group/img relative aspect-[4/3] w-full overflow-hidden bg-secondary ${
-          editing && zoom !== "none" ? "cursor-crosshair" : ""
+          awaitingFocus ? "cursor-crosshair" : ""
         }`}
       >
         {frame.imageUrl ? (
@@ -206,7 +208,7 @@ export function FrameCard({
             alt={frame.title}
             draggable={false}
             style={motionStyle(frame)}
-            className={`h-full w-full object-cover ${motionOn ? "frame-preview-anim" : ""}`}
+            className={`h-full w-full object-cover ${previewMotionOn ? "frame-preview-anim" : ""}`}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
@@ -273,10 +275,16 @@ export function FrameCard({
                   <Pill active={zoom === "none"} onClick={() => onChange({ motionZoom: "none" })}>
                     None
                   </Pill>
-                  <Pill active={zoom === "in"} onClick={() => onChange({ motionZoom: "in" })}>
+                  <Pill
+                    active={zoom === "in"}
+                    onClick={() => onChange({ motionZoom: "in", focusX: undefined, focusY: undefined })}
+                  >
                     <ZoomIn className="h-3 w-3" /> In
                   </Pill>
-                  <Pill active={zoom === "out"} onClick={() => onChange({ motionZoom: "out" })}>
+                  <Pill
+                    active={zoom === "out"}
+                    onClick={() => onChange({ motionZoom: "out", focusX: undefined, focusY: undefined })}
+                  >
                     <ZoomOut className="h-3 w-3" /> Out
                   </Pill>
                 </div>
@@ -324,7 +332,7 @@ export function FrameCard({
                 <div className="border-t border-foreground/15 px-3 py-2">
                   <p className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                     <Crosshair className="h-3 w-3" />
-                    {hasFocus ? "Focus set — drag dot on image" : "Click on image to set focus"}
+                    {hasFocus ? "Focus set — drag dot on image" : `Click on image to target zoom ${zoom}`}
                   </p>
                   {hasFocus && (
                     <button
