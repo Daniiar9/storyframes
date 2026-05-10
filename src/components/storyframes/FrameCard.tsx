@@ -69,6 +69,23 @@ export function FrameCard({
   const imgWrapRef = useRef<HTMLDivElement>(null);
   const dotDragRef = useRef(false);
 
+  function stopFocusDrag() {
+    dotDragRef.current = false;
+  }
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handlePointerEnd = () => stopFocusDrag();
+    window.addEventListener("pointerup", handlePointerEnd, true);
+    window.addEventListener("pointercancel", handlePointerEnd, true);
+    window.addEventListener("blur", handlePointerEnd);
+    return () => {
+      window.removeEventListener("pointerup", handlePointerEnd, true);
+      window.removeEventListener("pointercancel", handlePointerEnd, true);
+      window.removeEventListener("blur", handlePointerEnd);
+    };
+  }, []);
+
   function setFocusFromEvent(e: React.PointerEvent | PointerEvent) {
     if (!imgWrapRef.current) return;
     const rect = imgWrapRef.current.getBoundingClientRect();
@@ -77,22 +94,18 @@ export function FrameCard({
     onChange({ focusX: x, focusY: y });
   }
   function onImagePointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    if (!editing) return;
+    if (!editing || zoom === "none" || e.button !== 0) return;
     if ((e.target as HTMLElement).closest("[data-no-dot]")) return;
     dotDragRef.current = true;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     setFocusFromEvent(e);
   }
   function onImagePointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    if (!dotDragRef.current) return;
+    if (!dotDragRef.current || (typeof e.buttons === "number" && e.buttons === 0)) return;
     setFocusFromEvent(e);
   }
-  function onImagePointerUp(e: React.PointerEvent<HTMLDivElement>) {
+  function onImagePointerUp() {
     if (!dotDragRef.current) return;
-    dotDragRef.current = false;
-    try {
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch {}
+    stopFocusDrag();
   }
 
   function resetMotion() {
@@ -184,7 +197,7 @@ export function FrameCard({
         onPointerUp={onImagePointerUp}
         onPointerCancel={onImagePointerUp}
         className={`group/img relative aspect-[4/3] w-full overflow-hidden bg-secondary ${
-          editing ? "cursor-crosshair" : ""
+          editing && zoom !== "none" ? "cursor-crosshair" : ""
         }`}
       >
         {frame.imageUrl ? (
@@ -460,7 +473,14 @@ interface InlineEditProps {
   loading?: boolean;
 }
 
-function InlineEdit({ value, onChange, placeholder, className, multiline, loading }: InlineEditProps) {
+function InlineEdit({
+  value,
+  onChange,
+  placeholder,
+  className,
+  multiline,
+  loading,
+}: InlineEditProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const ref = useRef<HTMLTextAreaElement | HTMLInputElement>(null);
@@ -483,7 +503,11 @@ function InlineEdit({ value, onChange, placeholder, className, multiline, loadin
 
   if (loading) {
     return (
-      <div className={`${className} animate-pulse space-y-2`} aria-busy="true" aria-label="Generating">
+      <div
+        className={`${className} animate-pulse space-y-2`}
+        aria-busy="true"
+        aria-label="Generating"
+      >
         <div className="h-3 w-3/4 bg-foreground/10" />
         {multiline && <div className="h-3 w-1/2 bg-foreground/10" />}
       </div>
@@ -499,7 +523,10 @@ function InlineEdit({ value, onChange, placeholder, className, multiline, loadin
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => {
-            if (e.key === "Escape") { setDraft(value); setEditing(false); }
+            if (e.key === "Escape") {
+              setDraft(value);
+              setEditing(false);
+            }
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) commit();
           }}
           rows={3}
@@ -515,7 +542,10 @@ function InlineEdit({ value, onChange, placeholder, className, multiline, loadin
         onBlur={commit}
         onKeyDown={(e) => {
           if (e.key === "Enter") commit();
-          if (e.key === "Escape") { setDraft(value); setEditing(false); }
+          if (e.key === "Escape") {
+            setDraft(value);
+            setEditing(false);
+          }
         }}
         className={`${className} w-full border-b border-foreground/40 bg-transparent outline-none focus:border-foreground`}
       />
