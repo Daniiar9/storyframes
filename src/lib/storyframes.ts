@@ -121,30 +121,50 @@ export function motionStyle(f: Frame): React.CSSProperties {
   const pan: PanDir = f.motionPan ?? "none";
   const i = Math.max(0, Math.min(100, f.motionIntensity ?? 50)) / 100;
 
+  const hasFocus = f.focusX != null && f.focusY != null;
   const zoomDelta = 0.04 + i * 0.18; // 1.04 → 1.22
-  const panAmount = 3 + i * 8; // 3 → 11 (percent)
+
+  // When a focus point is set, keep the image always zoomed in around it so
+  // the focused area stays visible across the whole animation loop. The
+  // animation just oscillates between a slightly-zoomed and more-zoomed
+  // state, both anchored on the focus.
+  const baseZoom = hasFocus && zoom !== "none" ? 1 + zoomDelta * 0.45 : 1;
+
+  let fromScale = baseZoom, toScale = baseZoom;
+  if (zoom === "in") {
+    fromScale = baseZoom;
+    toScale = 1 + zoomDelta;
+  } else if (zoom === "out") {
+    fromScale = 1 + zoomDelta;
+    toScale = baseZoom;
+  }
+
+  // Pan amount — reduced when combined with a focus point so the camera
+  // never drifts the focused area out of view.
+  const panBase = 3 + i * 8; // 3 → 11 (%)
+  const panAmount = hasFocus && zoom !== "none" ? panBase * 0.35 : panBase;
   const panDelta = panAmount.toFixed(2) + "%";
   const negPanDelta = (-panAmount).toFixed(2) + "%";
 
-  let fromScale = 1, toScale = 1;
-  if (zoom === "in") { fromScale = 1; toScale = 1 + zoomDelta; }
-  else if (zoom === "out") { fromScale = 1 + zoomDelta; toScale = 1; }
-
   // Pan arrow = camera direction. Camera panning left means content shifts
-  // to the RIGHT in the frame, which is a positive X translate on the image.
-  // Start at 0 so the focus point stays anchored at the beginning of the
-  // loop, then drift in the camera direction.
+  // to the RIGHT in the frame (positive X translate on the image). Animate
+  // symmetrically around 0 so the focus stays roughly centered.
+  const half = (panAmount / 2).toFixed(2) + "%";
+  const negHalf = (-panAmount / 2).toFixed(2) + "%";
   let fromX = "0%", toX = "0%", fromY = "0%", toY = "0%";
-  if (pan === "left") { fromX = "0%"; toX = panDelta; }
-  else if (pan === "right") { fromX = "0%"; toX = negPanDelta; }
-  else if (pan === "up") { fromY = "0%"; toY = panDelta; }
-  else if (pan === "down") { fromY = "0%"; toY = negPanDelta; }
+  if (pan === "left") { fromX = negHalf; toX = half; }
+  else if (pan === "right") { fromX = half; toX = negHalf; }
+  else if (pan === "up") { fromY = negHalf; toY = half; }
+  else if (pan === "down") { fromY = half; toY = negHalf; }
 
-  // If only panning (no zoom), keep a slight scale so edges don't reveal
+  // If only panning (no zoom), keep a slight scale so edges don't reveal.
   if (zoom === "none" && pan !== "none") {
     fromScale = 1.08;
     toScale = 1.08;
   }
+
+  // Suppress unused warning for the larger pan range when focus isn't set.
+  void panDelta; void negPanDelta;
 
   const origin =
     f.focusX != null && f.focusY != null
