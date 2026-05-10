@@ -1,42 +1,56 @@
-# Storyteller Studio
+# StoryFrames
 
-A personal demo / experiment project built with Lovable. It explores a small
-"StoryFrames" UX for uploading images and adding zoom/pan motion to them.
-Intended as a portfolio / sandbox — not a production app.
+StoryFrames is a local-first web app for turning uploaded screenshots/images into a simple ordered visual story. It is intentionally a story builder, not a timeline editor.
 
-## Tech stack
+## What works
 
-- React 19 + TypeScript
-- TanStack Start (Router + SSR) on Vite 7
-- Tailwind CSS v4 + shadcn/ui
-- Deploys to Cloudflare Workers via Wrangler
+- Upload 3-8 images, or any small image sequence.
+- Add more images with the plus button.
+- Drag thumbnails to reorder the story.
+- Add one global context prompt.
+- Generate image-aware titles and captions with the OpenAI API.
+- Edit generated frame titles and captions inline.
+- Preview the ordered story with the Remotion Player.
+- Export simple PNG frames in the browser.
+- Render and download a basic MP4 through a local Remotion server route.
 
-## Getting started
+## What is not implemented yet
+
+- Auth, payments, database persistence, teams, collaboration, voiceover, and a complex timeline editor.
+- Background rendering queue or cloud rendering.
+- Persistent saved projects after a browser refresh.
+- Advanced export controls such as custom aspect ratios, audio, themes, and duration controls.
+
+## Setup
 
 ```bash
-bun install      # or: npm install
-bun run dev      # start the dev server
-bun run build    # production build
-bun run preview  # preview the production build
+npm install
 ```
 
-Then open the URL printed in the terminal (usually http://localhost:5173).
+Create `.env.local`:
 
-## Environment variables
+```bash
+OPENAI_API_KEY=your_api_key_here
+# Optional; defaults to gpt-5.2
+OPENAI_MODEL=gpt-5.2
+```
 
-This project does **not** require any secrets to run locally. There are no
-API keys, database URLs, or backend credentials in the codebase.
+Start the local app:
 
-If you fork it and add integrations later, copy `.env.example` to `.env.local`
-and fill in your own values. `.env*` files are gitignored.
+```bash
+npm run dev
+```
 
-## License
+Open:
 
-Personal/demo use. No license has been chosen yet — if you want to reuse the
-code, please open an issue or contact the author first.
+[http://localhost:3000](http://localhost:3000)
 
-## Notes
+## Remotion
 
-- This repo is a personal experiment; expect rough edges.
-- No real secrets are committed. See `.env.example` for the (currently empty)
-  shape of environment variables.
+The Remotion composition lives in `src/remotion`. The editor passes final ordered frames and captions as plain props, so the rendering layer can be replaced later.
+
+To inspect the composition directly:
+
+```bash
+npm run remotion:studio
+```
