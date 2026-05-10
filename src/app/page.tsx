@@ -30,7 +30,7 @@ import {
   Upload,
 } from "lucide-react";
 import type { MouseEvent } from "react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Player } from "@remotion/player";
 import {
   DEFAULT_FOCUS_POINT,
@@ -60,6 +60,7 @@ type GenerationResponse = {
 };
 
 const emptyStatus = "Upload images, order them, then generate the story.";
+const UPLOAD_INPUT_ID = "storyframes-image-upload";
 
 const motionPresetOptions: Array<{ value: MotionPreset; label: string }> = [
   { value: "none", label: "None" },
@@ -107,7 +108,7 @@ function SortableThumbnail({
       type="button"
       data-testid={`thumbnail-${index}`}
       onClick={onSelect}
-      className={`group grid w-full grid-cols-[34px_74px_1fr_22px] items-center gap-3 border p-2 text-left transition ${
+      className={`group grid w-full cursor-pointer grid-cols-[34px_74px_1fr_22px] items-center gap-3 border p-2 text-left transition ${
         selected
           ? "border-stone-950 bg-[#f7f5ef] shadow-[inset_4px_0_0_#1c1917]"
           : "border-stone-300 bg-[#fbfaf6] hover:border-stone-950"
@@ -197,7 +198,7 @@ function SelectField<T extends string>({
         id={id}
         value={value}
         onChange={(event) => onChange(event.target.value as T)}
-        className="mt-1 h-10 w-full border border-stone-300 bg-white px-3 text-sm font-medium text-stone-900 outline-none transition focus:border-stone-950"
+        className="mt-1 h-10 w-full cursor-pointer border border-stone-300 bg-white px-3 text-sm font-medium text-stone-900 outline-none transition focus:border-stone-950"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -240,7 +241,6 @@ async function readImageFile(file: File) {
 }
 
 export default function Home() {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [frames, setFrames] = useState<StoryFrame[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [contextPrompt, setContextPrompt] = useState("");
@@ -486,11 +486,12 @@ export default function Home() {
   return (
     <main className="grid min-h-screen grid-cols-1 bg-[#f3f0e8] pb-40 text-stone-950 lg:grid-cols-[320px_minmax(0,1fr)_390px] lg:pb-28">
       <input
-        ref={fileInputRef}
+        id={UPLOAD_INPUT_ID}
+        data-testid="image-upload-input"
         type="file"
         accept="image/*"
         multiple
-        className="hidden"
+        className="sr-only"
         onChange={(event) => {
           if (event.target.files) {
             void handleFiles(event.target.files);
@@ -508,14 +509,15 @@ export default function Home() {
               </p>
               <h1 className="mt-1 text-2xl font-semibold">StoryFrames</h1>
           </div>
-          <button
-            type="button"
+          <label
+            htmlFor={UPLOAD_INPUT_ID}
             title="Add images"
-            onClick={() => fileInputRef.current?.click()}
-              className="flex h-10 w-10 items-center justify-center border border-stone-950 bg-stone-950 text-white transition hover:bg-transparent hover:text-stone-950"
+            aria-label="Add images"
+            data-testid="upload-add-more"
+            className="flex h-10 w-10 cursor-pointer items-center justify-center border border-stone-950 bg-stone-950 text-white transition hover:bg-transparent hover:text-stone-950"
           >
             <Plus size={18} />
-          </button>
+          </label>
           </div>
           <div className="mt-4 flex items-center justify-between font-mono text-[11px] uppercase text-stone-500">
             <span>Frames</span>
@@ -540,10 +542,10 @@ export default function Home() {
             </SortableContext>
           </DndContext>
         ) : (
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex h-[520px] w-full flex-col items-center justify-center gap-4 border border-dashed border-stone-400 bg-[#f7f5ef] p-6 text-center text-stone-700 transition hover:border-stone-950 hover:bg-[#fbfaf6]"
+          <label
+            htmlFor={UPLOAD_INPUT_ID}
+            data-testid="upload-empty-rail"
+            className="flex h-[520px] w-full cursor-pointer flex-col items-center justify-center gap-4 border border-dashed border-stone-400 bg-[#f7f5ef] p-6 text-center text-stone-700 transition hover:border-stone-950 hover:bg-[#fbfaf6]"
           >
             <Upload size={28} />
             <span className="font-mono text-[11px] font-semibold uppercase text-stone-500">
@@ -552,7 +554,7 @@ export default function Home() {
             <span className="max-w-48 text-sm leading-6">
               Upload images first. Then describe the story in the prompt bar and generate.
             </span>
-          </button>
+          </label>
         )}
       </aside>
 
@@ -571,7 +573,7 @@ export default function Home() {
               type="button"
               onClick={exportPngFrames}
               disabled={!frames.length || isExportingPng}
-              className="inline-flex h-10 items-center gap-2 border border-stone-950 bg-transparent px-3 font-mono text-[11px] font-semibold uppercase transition hover:bg-stone-950 hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
+              className="inline-flex h-10 cursor-pointer items-center gap-2 border border-stone-950 bg-transparent px-3 font-mono text-[11px] font-semibold uppercase transition hover:bg-stone-950 hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
             >
               {isExportingPng ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
               PNG
@@ -580,7 +582,7 @@ export default function Home() {
               type="button"
               onClick={exportMp4}
               disabled={!frames.length || isRendering}
-              className="inline-flex h-10 items-center gap-2 border border-stone-950 bg-stone-950 px-3 font-mono text-[11px] font-semibold uppercase text-white transition hover:bg-transparent hover:text-stone-950 disabled:cursor-not-allowed disabled:opacity-45"
+              className="inline-flex h-10 cursor-pointer items-center gap-2 border border-stone-950 bg-stone-950 px-3 font-mono text-[11px] font-semibold uppercase text-white transition hover:bg-transparent hover:text-stone-950 disabled:cursor-not-allowed disabled:opacity-45"
             >
               {isRendering ? <Loader2 className="animate-spin" size={16} /> : <Film size={16} />}
               MP4
@@ -589,6 +591,7 @@ export default function Home() {
         </div>
 
         <div
+          data-testid="drop-zone"
           className="flex flex-1 items-center justify-center border border-stone-300 bg-[#151515] p-3"
           onDrop={(event) => {
             event.preventDefault();
@@ -605,15 +608,16 @@ export default function Home() {
                 compositionWidth={1920}
                 compositionHeight={1080}
                 fps={VIDEO_FPS}
+                acknowledgeRemotionLicense
                 controls
                 style={{ width: "100%", aspectRatio: "16 / 9" }}
               />
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex h-full min-h-[520px] w-full flex-col items-center justify-center gap-5 border border-dashed border-stone-600 p-8 text-stone-200 transition hover:border-stone-300"
+            <label
+              htmlFor={UPLOAD_INPUT_ID}
+              data-testid="upload-empty-preview"
+              className="flex h-full min-h-[520px] w-full cursor-pointer flex-col items-center justify-center gap-5 border border-dashed border-stone-600 p-8 text-stone-200 transition hover:border-stone-300"
             >
               <ImagePlus size={42} />
               <span className="font-mono text-[11px] font-semibold uppercase text-stone-400">
@@ -625,7 +629,7 @@ export default function Home() {
               <span className="max-w-md text-center text-sm leading-6 text-stone-400">
                 01 Upload images. 02 Describe what you are trying to show. 03 Generate the story.
               </span>
-            </button>
+            </label>
           )}
         </div>
 
@@ -680,7 +684,7 @@ export default function Home() {
                     <button
                       type="button"
                       onClick={() => updateFrame(selectedFrame.id, { focusX: undefined, focusY: undefined })}
-                      className="font-mono text-[10px] font-semibold uppercase text-stone-950 underline underline-offset-4"
+                      className="cursor-pointer font-mono text-[10px] font-semibold uppercase text-stone-950 underline underline-offset-4"
                     >
                       Reset focus
                     </button>
@@ -766,7 +770,7 @@ export default function Home() {
                   setIntroFrame(introFrame ? null : { title: "What this story shows", caption: contextPrompt });
                   setOutroFrame(outroFrame ? null : { title: "Main takeaway", caption: "" });
                 }}
-                className="font-mono text-[10px] font-semibold uppercase text-stone-950 underline underline-offset-4"
+                className="cursor-pointer font-mono text-[10px] font-semibold uppercase text-stone-950 underline underline-offset-4"
               >
                 {introFrame || outroFrame ? "Remove" : "Add"}
               </button>
@@ -812,7 +816,7 @@ export default function Home() {
             type="button"
             onClick={generateStory}
             disabled={!frames.length || !contextPrompt.trim() || isGenerating}
-            className="inline-flex h-16 items-center justify-center gap-2 border border-stone-950 bg-stone-950 px-5 font-mono text-[11px] font-semibold uppercase text-white transition hover:bg-transparent hover:text-stone-950 disabled:cursor-not-allowed disabled:opacity-45 lg:min-w-52"
+            className="inline-flex h-16 cursor-pointer items-center justify-center gap-2 border border-stone-950 bg-stone-950 px-5 font-mono text-[11px] font-semibold uppercase text-white transition hover:bg-transparent hover:text-stone-950 disabled:cursor-not-allowed disabled:opacity-45 lg:min-w-52"
           >
             {isGenerating ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
             {hasGeneratedStory ? "Regenerate story" : "Generate story"}
