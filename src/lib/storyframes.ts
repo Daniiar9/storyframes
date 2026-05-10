@@ -116,6 +116,16 @@ export function hasMotion(f: Pick<Frame, "motionZoom" | "motionPan">) {
   );
 }
 
+export function hasRenderableMotion(
+  f: Pick<Frame, "motionZoom" | "motionPan" | "focusX" | "focusY">,
+) {
+  const hasFocus = f.focusX != null && f.focusY != null;
+  return (
+    (f.motionPan && f.motionPan !== "none") ||
+    ((f.motionZoom && f.motionZoom !== "none") && hasFocus)
+  );
+}
+
 export function motionStyle(f: Frame): React.CSSProperties {
   const zoom: ZoomDir = f.motionZoom ?? "none";
   const pan: PanDir = f.motionPan ?? "none";
@@ -131,10 +141,10 @@ export function motionStyle(f: Frame): React.CSSProperties {
   const baseZoom = hasFocus && zoom !== "none" ? 1 + zoomDelta * 0.45 : 1;
 
   let fromScale = baseZoom, toScale = baseZoom;
-  if (zoom === "in") {
+  if (zoom === "in" && hasFocus) {
     fromScale = baseZoom;
     toScale = 1 + zoomDelta;
-  } else if (zoom === "out") {
+  } else if (zoom === "out" && hasFocus) {
     fromScale = 1 + zoomDelta;
     toScale = baseZoom;
   }
