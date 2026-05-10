@@ -28,6 +28,14 @@ import {
   Plus,
   Sparkles,
   Upload,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  ArrowDown,
+  ZoomIn,
+  ZoomOut,
+  Ban,
+  Crosshair,
 } from "lucide-react";
 import type { MouseEvent } from "react";
 import { useMemo, useState } from "react";
@@ -36,15 +44,21 @@ import {
   DEFAULT_FOCUS_POINT,
   DEFAULT_MOTION_INTENSITY,
   DEFAULT_MOTION_PRESET,
+  DEFAULT_PAN,
+  DEFAULT_ZOOM,
   FocusPoint,
   getFrameMotion,
   getStoryDurationInFrames,
+  hasFocusTarget,
+  hasRenderableMotion,
   MotionIntensity,
   MotionPreset,
+  Pan,
   StoryFrame,
   StoryProject,
   TextFrame,
   VIDEO_FPS,
+  Zoom,
 } from "@/lib/story";
 import { StoryVideo } from "@/remotion/StoryVideo";
 
@@ -79,13 +93,15 @@ const motionIntensityOptions: Array<{ value: MotionIntensity; label: string }> =
   { value: "strong", label: "Strong" },
 ];
 
-const focusPointOptions: Array<{ value: FocusPoint; label: string }> = [
-  { value: "center", label: "Center" },
-  { value: "top", label: "Top" },
-  { value: "bottom", label: "Bottom" },
-  { value: "left", label: "Left" },
-  { value: "right", label: "Right" },
-];
+function zoomToPreset(zoom: Zoom, pan: Pan, hasFocus: boolean): MotionPreset {
+  if (zoom === "in") return hasFocus ? "focus_zoom" : "zoom_in";
+  if (zoom === "out") return "zoom_out";
+  if (pan === "left") return "pan_left";
+  if (pan === "right") return "pan_right";
+  if (pan === "up") return "pan_up";
+  if (pan === "down") return "pan_down";
+  return "none";
+}
 
 function SortableThumbnail({
   frame,
