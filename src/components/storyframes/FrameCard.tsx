@@ -9,7 +9,7 @@ import type {
   MotionPreset,
 } from "@/lib/storyframes";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useMotionPick } from "./MotionPickContext";
+import { FrameMotionMenu } from "./FrameMotionMenu";
 
 interface Props {
   frame: Frame;
@@ -18,9 +18,10 @@ interface Props {
   onRemove: () => void;
   onRegenerate: () => void;
   loading?: boolean;
+  onApplyToAll?: (patch: Partial<Frame>) => void;
 }
 
-export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, loading }: Props) {
+export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, loading, onApplyToAll }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: frame.id,
   });
@@ -31,15 +32,14 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
     opacity: isDragging ? 0.4 : 1,
   };
 
-  const preset: MotionPreset = frame.motionPreset ?? "zoom_in";
+  const preset: MotionPreset = frame.motionPreset ?? "none";
   const intensity: MotionIntensity = frame.motionIntensity ?? "subtle";
   const focusPoint: FocusPoint = frame.focusPoint ?? "center";
   const hasCustomFocus = frame.focusX != null && frame.focusY != null;
 
   const [previewKey, setPreviewKey] = useState(0);
+  const [pickingFocus, setPickingFocus] = useState(false);
   const imgWrapRef = useRef<HTMLDivElement>(null);
-  const { armed, applyTo } = useMotionPick();
-  const isPickable = !!armed && !!frame.imageUrl;
 
   // Re-trigger the in-card preview animation whenever motion settings change
   useEffect(() => {
@@ -47,16 +47,27 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
     setPreviewKey((k) => k + 1);
   }, [preset, intensity, focusPoint, frame.focusX, frame.focusY, frame.imageUrl]);
 
+  // Esc cancels custom-focus pick mode
+  useEffect(() => {
+    if (!pickingFocus) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPickingFocus(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pickingFocus]);
+
   function handleImageClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (!armed || !imgWrapRef.current) return;
-    if (armed.kind === "customFocus") {
-      const rect = imgWrapRef.current.getBoundingClientRect();
-      const x = clamp01((e.clientX - rect.left) / rect.width);
-      const y = clamp01((e.clientY - rect.top) / rect.height);
-      applyTo(frame.id, { focusX: x, focusY: y });
-    } else {
-      applyTo(frame.id);
-    }
+    if (!pickingFocus || !imgWrapRef.current) return;
+    const rect = imgWrapRef.current.getBoundingClientRect();
+    const x = clamp01((e.clientX - rect.left) / rect.width);
+    const y = clamp01((e.clientY - rect.top) / rect.height);
+    onChange({
+      motionPreset: preset === "none" ? "focus_zoom" : preset,
+      focusX: x,
+      focusY: y,
+    });
+    setPickingFocus(false);
   }
 
   function clearFocus(e: React.MouseEvent) {
@@ -68,9 +79,7 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
     <div
       ref={setNodeRef}
       style={style}
-      className={`group relative flex flex-col bg-card transition ${
-        isPickable ? "ring-1 ring-foreground/30 hover:ring-foreground" : ""
-      }`}
+      className="group relative flex flex-col bg-card transition"
     >
       {/* number + drag */}
       <div className="flex items-center justify-between border-b border-foreground/15 px-3 py-2">
@@ -131,7 +140,7 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
         data-no-dnd
         onClick={frame.imageUrl ? handleImageClick : undefined}
         className={`group/img relative aspect-[4/3] w-full overflow-hidden bg-secondary ${
-          isPickable ? "cursor-crosshair" : ""
+          pickingFocus ? "cursor-crosshair ring-1 ring-foreground" : ""
         }`}
       >
         {frame.imageUrl ? (
@@ -165,6 +174,33 @@ export function FrameCard({ frame, index, onChange, onRemove, onRegenerate, load
               <X className="h-2.5 w-2.5" />
             </button>
           </>
+        )}
+
+        {/* Pick-mode hint */}
+        {pickingFocus && frame.imageUrl && (
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-between bg-foreground/90 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-background">
+            <span>Click to set focus</span>
+            <span className="opacity-70">Esc to cancel</span>
+          </div>
+        )}
+
+        {/* Inline motion menu — bottom-left of image */}
+        {frame.imageUrl && (
+          <div
+            className={`pointer-events-none absolute bottom-2 left-2 z-10 transition ${
+              pickingFocus
+                ? "opacity-0"
+                : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+            } ${preset !== "none" || hasCustomFocus ? "!opacity-100" : ""}`}
+          >
+            <FrameMotionMenu
+              frame={frame}
+              onChange={onChange}
+              onApplyToAll={(p) => onApplyToAll?.(p)}
+              onPickCustomFocus={() => setPickingFocus(true)}
+              customFocusActive={pickingFocus}
+            />
+          </div>
         )}
       </div>
 
