@@ -37,7 +37,7 @@ export function Uploader({ onFiles, variant = "hero" }: Props) {
           type="file"
           accept="image/*"
           multiple
-          hidden
+          className="sr-only"
           onChange={(e) => {
             handleFiles(e.target.files);
             e.target.value = "";
@@ -84,7 +84,7 @@ export function Uploader({ onFiles, variant = "hero" }: Props) {
         type="file"
         accept="image/*"
         multiple
-        hidden
+        className="sr-only"
         onChange={(e) => {
           handleFiles(e.target.files);
           e.target.value = "";
