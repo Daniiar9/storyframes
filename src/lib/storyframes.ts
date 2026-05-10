@@ -122,17 +122,23 @@ export function motionStyle(f: Frame): React.CSSProperties {
   const i = Math.max(0, Math.min(100, f.motionIntensity ?? 50)) / 100;
 
   const zoomDelta = 0.04 + i * 0.18; // 1.04 → 1.22
-  const panDelta = (3 + i * 8).toFixed(2) + "%"; // 3% → 11%
+  const panAmount = 3 + i * 8; // 3 → 11 (percent)
+  const panDelta = panAmount.toFixed(2) + "%";
+  const negPanDelta = (-panAmount).toFixed(2) + "%";
 
   let fromScale = 1, toScale = 1;
   if (zoom === "in") { fromScale = 1; toScale = 1 + zoomDelta; }
   else if (zoom === "out") { fromScale = 1 + zoomDelta; toScale = 1; }
 
+  // Pan arrow = camera direction. Camera panning left means content shifts
+  // to the RIGHT in the frame, which is a positive X translate on the image.
+  // Start at 0 so the focus point stays anchored at the beginning of the
+  // loop, then drift in the camera direction.
   let fromX = "0%", toX = "0%", fromY = "0%", toY = "0%";
-  if (pan === "left") { fromX = panDelta; toX = `-${panDelta}`; }
-  else if (pan === "right") { fromX = `-${panDelta}`; toX = panDelta; }
-  else if (pan === "up") { fromY = panDelta; toY = `-${panDelta}`; }
-  else if (pan === "down") { fromY = `-${panDelta}`; toY = panDelta; }
+  if (pan === "left") { fromX = "0%"; toX = panDelta; }
+  else if (pan === "right") { fromX = "0%"; toX = negPanDelta; }
+  else if (pan === "up") { fromY = "0%"; toY = panDelta; }
+  else if (pan === "down") { fromY = "0%"; toY = negPanDelta; }
 
   // If only panning (no zoom), keep a slight scale so edges don't reveal
   if (zoom === "none" && pan !== "none") {
